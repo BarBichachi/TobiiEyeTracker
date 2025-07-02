@@ -48,7 +48,7 @@ def on_gaze_data(data):
             now.minute * 60_000 +
             now.second * 1_000 +
             now.microsecond // 1_000
-) / 1000
+                ) / 1000
 
     lx, ly = data['left_gaze_point_on_display_area']
     rx, ry = data['right_gaze_point_on_display_area']
@@ -77,7 +77,7 @@ def show_video():
     paused = False
 
     cv2.namedWindow('Main Window', cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty('Main Window', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    #cv2.setWindowProperty('Main Window', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     while True:
         if not paused:
@@ -130,7 +130,7 @@ def update_graph_data():
     entropy_r = math.log(delta_r / r_thresh) if delta_r > r_thresh else 0
 
     try:
-        window.update_graphs([delta_x, delta_y, delta_r, entropy_x, entropy_y, entropy_r], timestamp, x_thresh, y_thresh)
+        window.update_graphs([delta_x, delta_y, delta_r, entropy_x, entropy_y, entropy_r], timestamp)
     except Exception as e:
         print(f"Graph update error: {e}")
 
@@ -167,12 +167,12 @@ if __name__ == '__main__':
 
         # Create trackbars for HSV filtering
         cv2.namedWindow('Trackbar', cv2.WINDOW_NORMAL)
-        cv2.createTrackbar('Hue Min',  'Trackbar', hue_min, 255, on_trackbar_hue_min)
-        cv2.createTrackbar('Hue Max',  'Trackbar', hue_max, 255, on_trackbar_hue_max)
-        cv2.createTrackbar('Sat Min',  'Trackbar', sat_min, 255, on_trackbar_sat_min)
-        cv2.createTrackbar('Sat Max',  'Trackbar', sat_max, 255, on_trackbar_sat_max)
-        cv2.createTrackbar('Val Min',  'Trackbar', val_min, 255, on_trackbar_val_min)
-        cv2.createTrackbar('Val Max',  'Trackbar', val_max, 255, on_trackbar_val_max)
+        cv2.createTrackbar('Hue Min',  'Trackbar', 0, hue_min, on_trackbar_hue_min)
+        cv2.createTrackbar('Hue Max',  'Trackbar', 15, hue_max, on_trackbar_hue_max)
+        cv2.createTrackbar('Sat Min',  'Trackbar', 0, sat_min, on_trackbar_sat_min)
+        cv2.createTrackbar('Sat Max',  'Trackbar', 255, sat_max, on_trackbar_sat_max)
+        cv2.createTrackbar('Val Min',  'Trackbar', 0, val_min, on_trackbar_val_min)
+        cv2.createTrackbar('Val Max',  'Trackbar', 40, val_max, on_trackbar_val_max)
         cv2.createTrackbar('Grayscale', 'Trackbar', 0, 1, on_trackbar_grayscale)
 
         # Start video display thread

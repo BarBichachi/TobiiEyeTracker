@@ -1,0 +1,2 @@
+1. Eye tracking to help the person controlling the system - Integrate eye tracking to INP-25 (Eye tracker should work simultaneously with TVT)
+2. Go over Eye-Tracker SDK
