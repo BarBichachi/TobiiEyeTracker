@@ -9,4 +9,4 @@ print("Using device:", "CUDA" if device == 0 else "CPU")
 model = YOLO('models/yolo11n.pt')
 model.export(format="engine", device=device)
 
-print("✅ Export complete: YOLO model saved as TensorRT engine.")
+print("✅ Export complete: YOLO model saved.")
