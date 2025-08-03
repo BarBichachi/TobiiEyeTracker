@@ -27,20 +27,39 @@ x_thresh = 25
 y_thresh = 25
 r_thresh = math.sqrt(x_thresh**2 + y_thresh**2)
 
-# Text overlay (future use)
-attention_text = {
-    "text": "Are You still here?",
-    "font": cv2.FONT_HERSHEY_SIMPLEX,
-    "position": (120, 120),
-    "scale": 1,
+# Gaze lost control
+attention_label = {
+    "text": "Are you still here?",
+    "org": (40, 80),
+    "fontFace": cv2.FONT_HERSHEY_DUPLEX,
+    "fontScale": 2,
     "color": (0, 0, 255),
-    "thickness": 4,
-    "line_type": cv2.LINE_AA
+    "thickness": 2,
+    "lineType": cv2.LINE_AA
 }
+last_gaze_time = time.time()
+gaze_lost = False
+gaze_timeout_seconds = 2
+
+# User tracking state
+user_is_tracking = False
+gaze_tolerance = 50  # pixels
+
+# Tracking label
+tracking_label = {
+    "text": "Tracking mode: Computer",
+    "org": (0, 0),
+    "fontFace": cv2.FONT_HERSHEY_DUPLEX,
+    "fontScale": 1,
+    "color": (0, 0, 255),
+    "thickness": 2,
+    "lineType": cv2.LINE_AA
+}
+
 
 # ---------------------- Gaze Callback ----------------------
 def on_gaze_data(data):
-    global gaze_x, gaze_y, timestamp
+    global gaze_x, gaze_y, timestamp, last_gaze_time, gaze_lost
 
     now = datetime.now()
     timestamp = (
@@ -54,6 +73,8 @@ def on_gaze_data(data):
     rx, ry = data['right_gaze_point_on_display_area']
     gaze_x = int((lx + rx) / 2 * screen_width)
     gaze_y = int((ly + ry) / 2 * screen_height)
+    last_gaze_time = time.time()
+    gaze_lost = False
 
 # ---------------------- Trackbar Handlers ----------------------
 def on_trackbar_hue_min(val):   global hue_min; hue_min = val
@@ -73,7 +94,7 @@ def distance(x1, y1, x2, y2):
 
 # ---------------------- Video Display Loop ----------------------
 def show_video():
-    global target_x, target_y
+    global target_x, target_y, last_gaze_time, gaze_lost, user_is_tracking
     paused = False
 
     cv2.namedWindow('Main Window', cv2.WINDOW_NORMAL)
@@ -101,11 +122,37 @@ def show_video():
             largest = max(contours, key=cv2.contourArea)
             x, y, w, h = cv2.boundingRect(largest)
             target_x, target_y = x + w // 2, y + h // 2
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
-            cv2.line(frame, (target_x, target_y), (gaze_x, gaze_y), (255, 255, 255), 2)
 
-        # Optional future: overlay text prompt
-        # cv2.putText(frame, **attention_text)
+            # Check if user is tracking the object
+            if distance(gaze_x, gaze_y, target_x, target_y) < gaze_tolerance:
+                user_is_tracking = True
+                last_gaze_time = time.time()
+                gaze_lost = False
+            else:
+                user_is_tracking = False
+
+            # Draw rectangle based on gaze status
+            if user_is_tracking:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)  # green
+                cv2.line(frame, (target_x, target_y), (gaze_x, gaze_y), (255, 255, 255), 2)
+
+                tracking_label["text"] = "Tracking mode: User"
+                tracking_label["color"] = (0, 255, 0)
+            else:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)  # red
+
+                tracking_label["text"] = "Tracking mode: Computer"
+                tracking_label["color"] = (0, 0, 255)
+
+        cv2.putText(frame, **tracking_label)
+
+        # Show attention text if gaze lost for >3s
+        if time.time() - last_gaze_time > gaze_timeout_seconds:
+            gaze_lost = True
+
+        # Ask "Are you still here?"
+        if gaze_lost:
+            cv2.putText(frame, **attention_label)
 
         cv2.imshow('Main Window', frame)
 
@@ -114,6 +161,7 @@ def show_video():
         if key == ord(' '):
             paused = not paused
         elif key == ord('q'):
+            app.quit()
             break
 
     cap.release()
@@ -164,6 +212,7 @@ if __name__ == '__main__':
         wait_time = int(1000 / video_fps) if video_fps > 0 else 33
         screen_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         screen_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        tracking_label["org"] = (int(screen_width // 2) - 180, 50)
 
         # Create trackbars for HSV filtering
         cv2.namedWindow('Trackbar', cv2.WINDOW_NORMAL)
