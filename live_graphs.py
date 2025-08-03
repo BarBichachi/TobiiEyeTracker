@@ -2,7 +2,8 @@ import os
 from datetime import datetime, time
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtWidgets import (QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout)
+from PyQt5.QtWidgets import (QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout)
+from pyqtgraph.exporters import ImageExporter
 
 class LiveGraphs(QWidget):
     """ Real-time graphs with live stats and CSV export. """
@@ -39,11 +40,12 @@ class LiveGraphs(QWidget):
             plot_layout = QVBoxLayout()
 
             plot_widget = pg.PlotWidget()
-            plot_widget.setBackground('k')
+            plot_widget.setBackground('#333333')
+            #curve = plot_widget.plot([], [], pen=pg.mkPen('y', width=2))  # Bright yellow line
             plot_widget.showGrid(x=True, y=True)
             plot_widget.setLabel('bottom', 'Time', units='s')
             plot_widget.setLabel('left', labels[i], units='')
-            plot_widget.setYRange(0, 10)
+            plot_widget.enableAutoRange(axis='y', enable=True)
             plot_widget.setXRange(0, 10)
 
             curve = plot_widget.plot(pen=colors[i])
@@ -122,6 +124,15 @@ class LiveGraphs(QWidget):
         ymax = np.max(self.y_data[i])
         yavg = np.mean(self.y_data[i])
         self.stats_labels[i].setText(f"Min: {ymin:.2f}  Max: {ymax:.2f}  Avg: {yavg:.2f}")
+
+        if ymin == ymax:
+            ymin -= 1
+            ymax += 1
+        else:
+            margin = (ymax - ymin) * 0.1
+            ymin -= margin
+            ymax += margin
+
         self.plots[i].setYRange(ymin, ymax)
 
     def _refresh_plot(self, i, current_time):
@@ -129,6 +140,8 @@ class LiveGraphs(QWidget):
         if current_time > 10:
             self.plots[i].setXRange(current_time - 10, current_time)
         self.curves[i].setData(self.x_data[i], self.y_data[i])
+        self.plots[i].getPlotItem().update()
+
 
     # --------------------- Export ---------------------
 

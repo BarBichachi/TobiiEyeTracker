@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import cv2
-from PySide6.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication
 import tobii_research as tr
 
 import live_graphs
