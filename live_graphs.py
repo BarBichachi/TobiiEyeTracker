@@ -41,7 +41,6 @@ class LiveGraphs(QWidget):
 
             plot_widget = pg.PlotWidget()
             plot_widget.setBackground('#333333')
-            #curve = plot_widget.plot([], [], pen=pg.mkPen('y', width=2))  # Bright yellow line
             plot_widget.showGrid(x=True, y=True)
             plot_widget.setLabel('bottom', 'Time', units='s')
             plot_widget.setLabel('left', labels[i], units='')
