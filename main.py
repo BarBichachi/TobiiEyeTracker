@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 from PyQt5.QtWidgets import QApplication
 import tobii_research as tr
+from playsound import playsound
 
 import live_graphs
 
@@ -44,6 +45,8 @@ gaze_timeout_seconds = 2
 # User tracking state
 user_is_tracking = False
 gaze_tolerance = 50  # pixels
+current_gaze_mode = None
+last_user_not_here_beep_time = 0
 
 # Tracking label
 tracking_label = {
@@ -55,6 +58,43 @@ tracking_label = {
     "thickness": 2,
     "lineType": cv2.LINE_AA
 }
+
+# Button for example
+button_rect = {
+    "x": 270,
+    "y": 20,
+    "w": 200,
+    "h": 50
+}
+button_label = {
+    "text": "Press Me",
+    "font": cv2.FONT_HERSHEY_SIMPLEX,
+    "position": (button_rect["x"] + 30, button_rect["y"] + 35),
+    "scale": 1,
+    "color": (255, 255, 255),
+    "thickness": 2
+}
+button_pressed_cooldown = 2.0
+last_button_press_time = 0
+
+# Sound paths
+USER_MODE_SOUND = "assets/sounds/user_mode.wav"
+COMPUTER_MODE_SOUND = "assets/sounds/computer_mode.wav"
+USER_NOT_HERE_SOUND = "assets/sounds/user_not_here.wav"
+BUTTON_PRESSED_SOUND = "assets/button_pressed.wav"
+
+# ---------------------- Play sound ----------------------
+def play_user_mode_sound():
+    playsound(USER_MODE_SOUND, block=False)
+
+def play_computer_mode_sound():
+    playsound(COMPUTER_MODE_SOUND, block=False)
+
+def play_user_not_here_sound():
+    playsound(USER_NOT_HERE_SOUND, block=False)
+
+def play_button_pressed_sound():
+    playsound("beeps/button_pressed.wav", block=False)
 
 
 # ---------------------- Gaze Callback ----------------------
@@ -76,6 +116,7 @@ def on_gaze_data(data):
     last_gaze_time = time.time()
     gaze_lost = False
 
+
 # ---------------------- Trackbar Handlers ----------------------
 def on_trackbar_hue_min(val):   global hue_min; hue_min = val
 def on_trackbar_hue_max(val):   global hue_max; hue_max = val
@@ -85,6 +126,7 @@ def on_trackbar_val_min(val):   global val_min; val_min = val
 def on_trackbar_val_max(val):   global val_max; val_max = val
 def on_trackbar_grayscale(val): global is_grayscale; is_grayscale = bool(val)
 
+
 # ---------------------- Math Utilities ----------------------
 def delta(a, b):
     return a - b
@@ -92,9 +134,10 @@ def delta(a, b):
 def distance(x1, y1, x2, y2):
     return math.hypot(delta(x1, x2), delta(y1, y2))
 
+
 # ---------------------- Video Display Loop ----------------------
 def show_video():
-    global target_x, target_y, last_gaze_time, gaze_lost, user_is_tracking
+    global target_x, target_y, last_gaze_time, gaze_lost, user_is_tracking, current_gaze_mode, last_user_not_here_beep_time, last_button_press_time
     paused = False
 
     cv2.namedWindow('Main Window', cv2.WINDOW_NORMAL)
@@ -106,6 +149,8 @@ def show_video():
             if not success:
                 print("Warning: Frame read failed.")
                 continue
+
+        current_time = time.time()
 
         # HSV filter to isolate object
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -131,28 +176,52 @@ def show_video():
             else:
                 user_is_tracking = False
 
-            # Draw rectangle based on gaze status
+            # Draw tracking rectangle based on gaze status
             if user_is_tracking:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)  # green
-                cv2.line(frame, (target_x, target_y), (gaze_x, gaze_y), (255, 255, 255), 2)
+                if current_gaze_mode != "user":
+                    play_user_mode_sound()
+                    current_gaze_mode = "user"
 
                 tracking_label["text"] = "Tracking mode: User"
                 tracking_label["color"] = (0, 255, 0)
+
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)  # green
+                cv2.line(frame, (target_x, target_y), (gaze_x, gaze_y), (255, 255, 255), 2)
+
             else:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)  # red
+                if current_gaze_mode != "computer":
+                    play_computer_mode_sound()
+                    current_gaze_mode = "computer"
 
                 tracking_label["text"] = "Tracking mode: Computer"
                 tracking_label["color"] = (0, 0, 255)
 
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)  # red
+
+            # Check if user is gazing at the button
+            if (button_rect["x"] <= gaze_x <= button_rect["x"] + button_rect["w"] and
+                    button_rect["y"] <= gaze_y <= button_rect["y"] + button_rect["h"]):
+
+                if current_time - last_button_press_time > button_pressed_cooldown:
+                    play_button_pressed_sound()
+                    last_button_press_time = time.time()
+
         cv2.putText(frame, **tracking_label)
 
         # Show attention text if gaze lost for >3s
-        if time.time() - last_gaze_time > gaze_timeout_seconds:
-            gaze_lost = True
-
-        # Ask "Are you still here?"
-        if gaze_lost:
+        if current_time - last_gaze_time > gaze_timeout_seconds:
             cv2.putText(frame, **attention_label)
+
+            # Beep every 2 seconds when user is not here
+            if current_time - last_user_not_here_beep_time > 2:
+                play_user_not_here_sound()
+                last_user_not_here_beep_time = current_time
+
+        cv2.rectangle(frame,
+            (button_rect["x"], button_rect["y"]),
+            (button_rect["x"] + button_rect["w"], button_rect["y"] + button_rect["h"]),
+            (100, 100, 255), 2)
+        cv2.putText(frame, **button_label)
 
         cv2.imshow('Main Window', frame)
 
@@ -166,6 +235,7 @@ def show_video():
 
     cap.release()
     cv2.destroyAllWindows()
+
 
 # ---------------------- Real-Time Graph Update ----------------------
 def update_graph_data():
@@ -182,6 +252,7 @@ def update_graph_data():
     except Exception as e:
         print(f"Graph update error: {e}")
 
+
 # ---------------------- Utility ----------------------
 def run_periodically(interval, func):
     def runner():
@@ -189,6 +260,7 @@ def run_periodically(interval, func):
             func()
             time.sleep(interval)
     threading.Thread(target=runner, daemon=True).start()
+
 
 # ---------------------- Main Execution ----------------------
 if __name__ == '__main__':
