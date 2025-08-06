@@ -5,7 +5,6 @@
 
 from datetime import datetime, time
 from core import state, math_utils, config
-import tobii_research as tr
 
 def on_gaze_data(data):
     """Callback function triggered by the Tobii SDK on new gaze data.
@@ -27,6 +26,13 @@ def on_gaze_data(data):
     state.last_gaze_time = time.time()
     state.gaze_lost = False
 
+    # Pupil diameters in mm
+    print("LEFT:", data.get('left_pupil_diameter'))
+    print("RIGHT:", data.get('right_pupil_diameter'))
+    state.left_pupil_diameter = data.get('left_pupil_diameter', 0.0)
+    state.right_pupil_diameter = data.get('right_pupil_diameter', 0.0)
+
+
 def is_gaze_on_rect(rect):
     """Returns True if the gaze point is within the given rectangle."""
     return (rect["x"] <= state.gaze_x <= rect["x"] + rect["w"] and
@@ -36,15 +42,3 @@ def is_user_tracking_object(tolerance=config.GAZE_TOLERANCE):
     """Returns True if the gaze is close enough to the tracked object center."""
     dist = math_utils.distance(state.gaze_x, state.gaze_y, state.target_x, state.target_y)
     return dist < tolerance
-
-def eye_openness_data_callback(data):
-    """Updates the global eye openness data with the latest values from the eye tracker."""
-    for key in state.eye_openness_data:
-        if key in data:
-            state.eye_openness_data[key] = data[key]
-
-def subscribe_to_eye_openness(eyetracker):
-    """Subscribes to the Tobii SDK eye openness stream and registers the callback."""
-    eyetracker.subscribe_to(tr.EYETRACKER_EYE_OPENNESS_DATA,
-        eye_openness_data_callback,
-        as_dictionary=True)

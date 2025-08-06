@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 from core import state, config, sound, gaze
-from ui import render
+from ui import render, eye_overlay
 
 # ---------------------- Video Display Loop ----------------------
 def show_video(cap, wait_time, app):
@@ -52,13 +52,16 @@ def show_video(cap, wait_time, app):
             # Prompt if gaze lost
             if current_time - state.last_gaze_time > config.GAZE_TIMEOUT_SECONDS:
                 render.draw_attention_prompt(frame)
-                if current_time - state.last_user_not_here_beep_time > 2:
+                if current_time - state.last_user_not_here_beep_time > config.BEEP_TIMEOUT_SECONDS:
                     sound.play_user_not_here_sound()
                     state.last_user_not_here_beep_time = current_time
 
-            # UI buttons and overlays
+            # Draw button
             render.draw_button_overlay(frame)
-            draw_eye_openness_overlay(frame, state.eye_openness_data)
+
+            # Draw left and right pupil indicators (fixed position)
+            eye_overlay.draw_pupil(frame, state.left_pupil_diameter, state.left_pupil_position)
+            eye_overlay.draw_pupil(frame, state.right_pupil_diameter, state.right_pupil_position)
 
             # Display frame
             cv2.imshow('Main Window', frame)

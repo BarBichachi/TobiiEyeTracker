@@ -2,17 +2,18 @@
 # Shared mutable runtime state for gaze tracking, attention, and UI behavior.
 # Used to coordinate values across modules without using global declarations.
 
-# ---------------------- Eye Openness ----------------------
-eye_openness_data = {
-    "left_eye_validity": False,
-    "right_eye_validity": False,
-    "left_eye_openness_value": 0.0,
-    "right_eye_openness_value": 0.0
-}
 
 # ---------------------- Gaze & Target ----------------------
 gaze_x, gaze_y = 0, 0
 target_x, target_y = 0, 0
+
+# ---------------------- Pupil (Both Eyes) ----------------------
+left_pupil_diameter = 0.0
+right_pupil_diameter = 0.0
+
+# Fixed screen positions to render them visually
+left_pupil_position = (1650, 850)
+right_pupil_position = (1800, 850)
 
 # ---------------------- Screen Dimensions ----------------------
 screen_width = 0

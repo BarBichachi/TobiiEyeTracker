@@ -15,8 +15,9 @@ IS_GRAYSCALE = False
 GAZE_TOLERANCE = 50
 X_THRESH = 25
 Y_THRESH = 25
-R_THRESH = (X_THRESH**2 + Y_THRESH**2)**0.5
-GAZE_TIMEOUT_SECONDS = 2
+R_THRESH = (X_THRESH ** 2 + Y_THRESH ** 2) ** 0.5
+GAZE_TIMEOUT_SECONDS = 3
+BEEP_TIMEOUT_SECONDS = 5
 
 # ---------------------- Attention Label ----------------------
 ATTENTION_LABEL = {
@@ -49,11 +50,12 @@ BUTTON_RECT = {
 }
 BUTTON_LABEL = {
     "text": "Press Me",
-    "font": cv2.FONT_HERSHEY_SIMPLEX,
-    "position": (300, 55),
-    "scale": 1,
-    "color": (255, 255, 255),
-    "thickness": 2
+    "org": (300, 55),
+    "fontFace": cv2.FONT_HERSHEY_SIMPLEX,
+    "fontScale": 1,
+    "color": (255, 0, 0),
+    "thickness": 2,
+    "lineType": cv2.LINE_AA
 }
 BUTTON_PRESSED_COOLDOWN = 2.0
 

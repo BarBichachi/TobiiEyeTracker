@@ -53,7 +53,6 @@ def start():
 
         tracker = eyetrackers[0]
         tracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data, as_dictionary=True)
-        gaze.subscribe_to_eye_openness(tracker)
 
         print("Eye Tracker Connected:")
         print("  Address:", tracker.address)
@@ -69,7 +68,21 @@ def start():
         # Store screen dimensions
         state.screen_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         state.screen_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+
+        # Center tracking mode label
         config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 180, 50)
+
+        # Center button under it
+        button_width = config.BUTTON_RECT["w"]
+        button_height = config.BUTTON_RECT["h"]
+        config.BUTTON_RECT["x"] = int(state.screen_width // 2 - button_width // 2)
+        config.BUTTON_RECT["y"] = config.TRACKING_MODE_LABEL["org"][1] + 60
+
+        # Adjust label position inside the button
+        config.BUTTON_LABEL["org"] = (
+            config.BUTTON_RECT["x"] + 20,
+            config.BUTTON_RECT["y"] + button_height // 2 + 10
+        )
 
         # Create trackbars
         trackbars.create_trackbars()
