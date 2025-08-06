@@ -12,8 +12,8 @@ left_pupil_diameter = 0.0
 right_pupil_diameter = 0.0
 
 # Fixed screen positions to render them visually
-left_pupil_position = (1650, 850)
-right_pupil_position = (1800, 850)
+left_pupil_position = (1650, 950)
+right_pupil_position = (1800, 950)
 
 # ---------------------- Screen Dimensions ----------------------
 screen_width = 0
