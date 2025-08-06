@@ -53,6 +53,7 @@ def start():
 
         tracker = eyetrackers[0]
         tracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data, as_dictionary=True)
+        gaze.subscribe_to_eye_openness(tracker)
 
         print("Eye Tracker Connected:")
         print("  Address:", tracker.address)

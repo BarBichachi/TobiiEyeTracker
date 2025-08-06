@@ -58,6 +58,7 @@ def show_video(cap, wait_time, app):
 
             # UI buttons and overlays
             render.draw_button_overlay(frame)
+            draw_eye_openness_overlay(frame, state.eye_openness_data)
 
             # Display frame
             cv2.imshow('Main Window', frame)
