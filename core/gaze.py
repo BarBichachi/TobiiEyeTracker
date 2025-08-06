@@ -2,8 +2,9 @@
 # Handles gaze data callback from the Tobii SDK and related gaze computations.
 # This includes real-time screen coordinate updates based on eye tracker input,
 # as well as utility functions to determine gaze interaction with on-screen elements.
-
-from datetime import datetime, time
+import math
+from datetime import datetime
+import time
 from core import state, math_utils, config
 
 def on_gaze_data(data):
@@ -20,17 +21,30 @@ def on_gaze_data(data):
     lx, ly = data['left_gaze_point_on_display_area']
     rx, ry = data['right_gaze_point_on_display_area']
 
-    # Convert to pixel coordinates using video frame dimensions
-    state.gaze_x = int((lx + rx) / 2 * state.screen_width)
-    state.gaze_y = int((ly + ry) / 2 * state.screen_height)
-    state.last_gaze_time = time.time()
-    state.gaze_lost = False
+    avg_x = math_utils.safe_average(lx, rx)
+    avg_y = math_utils.safe_average(ly, ry)
 
-    # Pupil diameters in mm
-    print("LEFT:", data.get('left_pupil_diameter'))
-    print("RIGHT:", data.get('right_pupil_diameter'))
-    state.left_pupil_diameter = data.get('left_pupil_diameter', 0.0)
-    state.right_pupil_diameter = data.get('right_pupil_diameter', 0.0)
+    # Convert to pixel coordinates using video frame dimensions
+    if avg_x is not None and avg_y is not None:
+        state.gaze_x = int(avg_x * state.screen_width)
+        state.gaze_y = int(avg_y * state.screen_height)
+        state.last_gaze_time = time.time()
+        state.gaze_lost = False
+
+    # Check if pupil diameter data is valid and get it
+    # LEFT EYE
+    left_diameter = data.get('left_pupil_diameter', 0.0)
+    if data.get('left_pupil_validity') == 1 and not math.isnan(left_diameter):
+        state.left_pupil_diameter = left_diameter
+    else:
+        state.left_pupil_diameter = 0.0
+
+    # RIGHT EYE
+    right_diameter = data.get('right_pupil_diameter', 0.0)
+    if data.get('right_pupil_validity') == 1 and not math.isnan(right_diameter):
+        state.right_pupil_diameter = right_diameter
+    else:
+        state.right_pupil_diameter = 0.0
 
 
 def is_gaze_on_rect(rect):
