@@ -130,11 +130,34 @@ def _set_tracking_label(mode, color):
 
 
 def _handle_gaze_button_interaction(current_time):
-    """Triggers sound and cooldown when the user's gaze is focused on the interactive button."""
-    if gaze.is_gaze_on_rect(config.BUTTON_RECT):
-        if current_time - state.last_button_press_time > config.BUTTON_PRESSED_COOLDOWN:
-            sound.play_button_pressed_sound()
-            state.last_button_press_time = current_time
+    """Dwell-to-press: requires continuous gaze on button for BUTTON_DWELL_SECONDS"""
+    on_button = gaze.is_gaze_on_rect(config.BUTTON_RECT)
+
+    # Reset on exit
+    if not on_button:
+        state.button_dwell_start_time = None
+        state.current_button_progress = 0.0
+        return
+
+    # Start dwell
+    if state.button_dwell_start_time is None:
+        state.button_dwell_start_time = current_time
+        state.current_button_progress = 0.0
+        return
+
+    # Update progress
+    dwell = current_time - state.button_dwell_start_time
+    state.current_button_progress = max(0.0, min(1.0, dwell / config.BUTTON_DWELL_SECONDS))
+
+    # Fire only after dwell time + cooldown
+    if (dwell >= config.BUTTON_DWELL_SECONDS and
+        (current_time - state.last_button_press_time) > config.BUTTON_PRESSED_COOLDOWN):
+        sound.play_button_pressed_sound()
+        state.last_button_press_time = current_time
+        # Reset so user must dwell again
+        state.button_dwell_start_time = None
+        state.current_button_progress = 0.0
+
 
 def _handle_pause_quit(wait_time, app, paused):
     """Handles pause/quit key inputs."""

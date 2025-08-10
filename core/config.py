@@ -18,6 +18,8 @@ Y_THRESH = 25
 R_THRESH = (X_THRESH ** 2 + Y_THRESH ** 2) ** 0.5
 GAZE_TIMEOUT_SECONDS = 3
 BEEP_TIMEOUT_SECONDS = 5
+BUTTON_DWELL_SECONDS = 1
+BUTTON_PRESSED_COOLDOWN = 2.0
 
 # ---------------------- Attention Label ----------------------
 ATTENTION_LABEL = {
@@ -57,7 +59,7 @@ BUTTON_LABEL = {
     "thickness": 2,
     "lineType": cv2.LINE_AA
 }
-BUTTON_PRESSED_COOLDOWN = 2.0
+BUTTON_PROGRESS_COLOR = (100, 200, 100)
 
 # ---------------------- Asset Paths ----------------------
 USER_MODE_SOUND = Path("assets/sounds/user_mode.wav")

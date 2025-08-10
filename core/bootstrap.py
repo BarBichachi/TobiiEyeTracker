@@ -9,6 +9,7 @@ import cv2
 from PyQt5.QtWidgets import QApplication
 import tobii_research as tr
 import numpy as np
+import atexit
 
 from core import state, config, gaze
 from ui import video_loop, trackbars, live_graphs
@@ -53,6 +54,10 @@ def start():
 
         tracker = eyetrackers[0]
         tracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data, as_dictionary=True)
+
+        # Ensure we always unsubscribe before process exit
+        tobii_shutdown = _make_tobii_shutdown(tracker)
+        atexit.register(tobii_shutdown)
 
         print("Eye Tracker Connected:")
         print("  Address:", tracker.address)
@@ -103,3 +108,13 @@ def start():
 
     except Exception as e:
         print(f"[Startup Error] {e}")
+
+# --- Tobii cleanup helper (closure holds a strong ref to tracker) ---
+def _make_tobii_shutdown(tracker):
+    """Explicitly unsubscribe from Tobii streams to avoid __del__ errors on exit."""
+    def _safe_shutdown():
+        try:
+            tracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data)
+        except Exception:
+            pass
+    return _safe_shutdown

@@ -8,8 +8,9 @@ import time
 from core import state, math_utils, config
 
 def on_gaze_data(data):
-    """Callback function triggered by the Tobii SDK on new gaze data.
-    Updates gaze position (in screen pixels), timestamp, and resets gaze_lost state."""
+    """Callback from Tobii: smooth gaze with Kalman, update state, handle pupils."""
+
+    # --- Timestamp (seconds within day, as before) ---
     now = datetime.now()
     state.timestamp = (
         now.hour * 3600_000 +
@@ -18,11 +19,16 @@ def on_gaze_data(data):
         now.microsecond // 1_000
     ) / 1000
 
+    # --- Read raw gaze (normalized 0..1) ---
     lx, ly = data['left_gaze_point_on_display_area']
     rx, ry = data['right_gaze_point_on_display_area']
-
     avg_x = math_utils.safe_average(lx, rx)
     avg_y = math_utils.safe_average(ly, ry)
+
+    # --- Validity flags ---
+    lv = data.get('left_gaze_point_validity', 0)
+    rv = data.get('right_gaze_point_validity', 0)
+    both_invalid = (lv != 1) and (rv != 1)
 
     # Convert to pixel coordinates using video frame dimensions
     if avg_x is not None and avg_y is not None:

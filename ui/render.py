@@ -41,4 +41,17 @@ def draw_button_overlay(frame):
         (btn["x"] + btn["w"], btn["y"] + btn["h"]),
         (100, 100, 255), 2
     )
+
+    # Progress fill (0..1)
+    p = state.current_button_progress
+    if p > 0.0:
+        fill_w = int(btn["w"] * max(0.0, min(1.0, p)))
+        cv2.rectangle(
+            frame,
+            (btn["x"], btn["y"]),
+            (btn["x"] + fill_w, btn["y"] + btn["h"]),
+            config.BUTTON_PROGRESS_COLOR,
+            thickness=-1
+        )
+
     cv2.putText(frame, **config.BUTTON_LABEL)
