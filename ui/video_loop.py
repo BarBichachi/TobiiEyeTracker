@@ -16,8 +16,14 @@ def show_video(cap, wait_time, app):
     tracking_label = config.TRACKING_MODE_LABEL
     cv2.namedWindow('Main Window', cv2.WINDOW_NORMAL)
 
+    # --- Sticky bbox (local): reuse last box briefly to avoid flicker ---
+    last_bbox = None
+    last_bbox_time = 0.0
+    box_stale_seconds = 0.3
+
     try:
         while True:
+            # --- Capture frame (unless paused) ---
             if not paused:
                 success, frame = cap.read()
                 if not success:
@@ -25,56 +31,61 @@ def show_video(cap, wait_time, app):
                     continue
 
             current_time = time.time()
+            bbox = None
 
-            # HSV mask to isolate tracked object
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            lower = np.array([config.HUE_MIN, config.SAT_MIN, config.VAL_MIN])
-            upper = np.array([config.HUE_MAX, config.SAT_MAX, config.VAL_MAX])
-            mask = cv2.inRange(hsv, lower, upper)
+            # --- Build the processing mask ---
+            mask_raw = _build_processing_mask(frame)
 
-            # Draw gaze location
-            render.draw_gaze_point(frame)
-
-            # Process tracking object if detected
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # --- Find contours from the ORIGINAL mask ---
+            contours, _ = cv2.findContours(mask_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:
                 x, y, w, h = _extract_largest_bbox(contours)
+                bbox = (x, y, w, h)
+                last_bbox = bbox
+                last_bbox_time = current_time
+
+                # --- Retrieves the center of the target ---
                 state.target_x, state.target_y = x + w // 2, y + h // 2
 
+                # --- Update mode/label/sounds based on current gaze state ---
                 _update_tracking_mode(current_time)
-                render.draw_tracking_overlay(frame, (x, y, w, h), tracking_label["color"])
+            else:
+                # --- Sticky reuse: keep last box for a short grace period ---
+                if last_bbox and (current_time - last_bbox_time) < box_stale_seconds:
+                    bbox = last_bbox
 
-                _handle_gaze_button_interaction(current_time)
+            # --- Choose a canvas to draw UI on (mask visualization OR color) ---
+            canvas = cv2.cvtColor(mask_raw, cv2.COLOR_GRAY2BGR) if config.IS_GRAYSCALE else frame.copy()
 
-            # Show mode label (User / Computer)
-            render.draw_tracking_label(frame, tracking_label)
+            # --- Draw gaze location ---
+            render.draw_gaze_point(canvas)
 
-            # Prompt if gaze lost
-            if current_time - state.last_gaze_time > config.GAZE_TIMEOUT_SECONDS:
-                render.draw_attention_prompt(frame)
-                if current_time - state.last_user_not_here_beep_time > config.BEEP_TIMEOUT_SECONDS:
-                    sound.play_user_not_here_sound()
-                    state.last_user_not_here_beep_time = current_time
+            # --- Show mode label (User / Computer) ---
+            render.draw_tracking_label(canvas, tracking_label)
 
-            # Draw button
-            render.draw_button_overlay(frame)
+            # --- Attention prompt & beep ---
+            _handle_attention_timeout(canvas, current_time)
 
-            # Draw left and right pupil indicators (fixed position)
-            eye_overlay.draw_pupil(frame, state.left_pupil_diameter, state.left_pupil_position)
-            eye_overlay.draw_pupil(frame, state.right_pupil_diameter, state.right_pupil_position)
+            # --- Draw button & handle interaction ---
+            render.draw_button_overlay(canvas)
+            _handle_gaze_button_interaction(current_time)
 
-            # Display frame
-            cv2.imshow('Main Window', frame)
+            # --- Draw left and right pupil indicators (fixed position) ---
+            eye_overlay.draw_pupil(canvas, state.left_pupil_diameter, state.left_pupil_position)
+            eye_overlay.draw_pupil(canvas, state.right_pupil_diameter, state.right_pupil_position)
 
-            # Handle key inputs
-            key = cv2.waitKey(wait_time) & 0xFF
-            action = _handle_key_input(key)
+            # --- Draw tracking box on target if we have one ---
+            if bbox is not None:
+                render.draw_tracking_overlay(canvas, bbox, tracking_label["color"])
 
-            if action == 'quit':
-                app.quit()
+            # --- Display ---
+            cv2.imshow('Main Window', canvas)
+
+            # --- Keyboard input: pause / quit ---
+            new_paused = _handle_pause_quit(wait_time, app, paused)
+            if new_paused is None:
                 break
-            elif action == 'pause_toggle':
-                paused = not paused
+            paused = new_paused
 
     finally:
         cap.release()
@@ -125,10 +136,32 @@ def _handle_gaze_button_interaction(current_time):
             sound.play_button_pressed_sound()
             state.last_button_press_time = current_time
 
-def _handle_key_input(key):
-    """Handles keyboard input for pausing and quitting during video display."""
-    if key == ord(' '):
-        return 'pause_toggle'
-    elif key == ord('q'):
-        return 'quit'
-    return None
+def _handle_pause_quit(wait_time, app, paused):
+    """Handles pause/quit key inputs."""
+    key = cv2.waitKey(wait_time) & 0xFF
+
+    # Map keys directly
+    if key == ord('q'):
+        app.quit()
+        return None  # signal to exit main loop
+    elif key == ord(' '):
+        return not paused  # toggle pause
+
+    return paused
+
+def _handle_attention_timeout(canvas, current_time):
+    """If gaze timeout exceeded, draw prompt and play beep (with cooldown)."""
+    if (current_time - state.last_gaze_time) > config.GAZE_TIMEOUT_SECONDS:
+        render.draw_attention_prompt(canvas)
+        if (current_time - state.last_user_not_here_beep_time) > config.BEEP_TIMEOUT_SECONDS:
+            sound.play_user_not_here_sound()
+            state.last_user_not_here_beep_time = current_time
+        return True
+    return False
+
+def _build_processing_mask(frame):
+    """Convert frame to HSV, used for contour detection only."""
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    lower = np.array([config.HUE_MIN, config.SAT_MIN, config.VAL_MIN])
+    upper = np.array([config.HUE_MAX, config.SAT_MAX, config.VAL_MAX])
+    return cv2.inRange(hsv, lower, upper)
