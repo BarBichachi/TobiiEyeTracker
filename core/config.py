@@ -51,11 +51,11 @@ TRACKING_MODE_LABEL = {
 BUTTON_RECT = {
     "x": 270,
     "y": 20,
-    "w": 200,
+    "w": 250,
     "h": 50
 }
 BUTTON_LABEL = {
-    "text": "Press Me",
+    "text": "Cognitive Aid",
     "org": (300, 55),
     "fontFace": cv2.FONT_HERSHEY_SIMPLEX,
     "fontScale": 1,

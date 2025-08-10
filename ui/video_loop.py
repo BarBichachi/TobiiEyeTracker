@@ -149,12 +149,12 @@ def _handle_gaze_button_interaction(current_time):
     dwell = current_time - state.button_dwell_start_time
     state.current_button_progress = max(0.0, min(1.0, dwell / config.BUTTON_DWELL_SECONDS))
 
-    # Fire only after dwell time + cooldown
-    if (dwell >= config.BUTTON_DWELL_SECONDS and
-        (current_time - state.last_button_press_time) > config.BUTTON_PRESSED_COOLDOWN):
+    # Fire only after dwell time
+    if dwell >= config.BUTTON_DWELL_SECONDS:
         sound.play_button_pressed_sound()
         config.IS_GRAYSCALE = not config.IS_GRAYSCALE
         state.last_button_press_time = current_time
+
         # Reset so user must dwell again
         state.button_dwell_start_time = None
         state.current_button_progress = 0.0
