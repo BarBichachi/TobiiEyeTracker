@@ -5,12 +5,11 @@
 import math
 from datetime import datetime
 import time
-from core import state, math_utils, config
+from core import state, math_utils, config, kalman_filter
 
 def on_gaze_data(data):
     """Callback from Tobii: smooth gaze with Kalman, update state, handle pupils."""
-
-    # --- Timestamp (seconds within day, as before) ---
+    # --- Timestamp (seconds within day) ---
     now = datetime.now()
     state.timestamp = (
         now.hour * 3600_000 +
@@ -25,15 +24,29 @@ def on_gaze_data(data):
     avg_x = math_utils.safe_average(lx, rx)
     avg_y = math_utils.safe_average(ly, ry)
 
-    # --- Validity flags ---
-    lv = data.get('left_gaze_point_validity', 0)
-    rv = data.get('right_gaze_point_validity', 0)
-    both_invalid = (lv != 1) and (rv != 1)
-
     # Convert to pixel coordinates using video frame dimensions
     if avg_x is not None and avg_y is not None:
-        state.gaze_x = int(avg_x * state.screen_width)
-        state.gaze_y = int(avg_y * state.screen_height)
+        raw_x = int(avg_x * state.screen_width)
+        raw_y = int(avg_y * state.screen_height)
+
+        # Check if the Kalman filters have been initialized
+        if state.kalman_x is None:
+            # First-run logic: initialize filters and set initial gaze, then return.
+            # The actual smoothing will start on the next data point.
+            setup_kalman_filters(raw_x, raw_y)
+            state.gaze_x = raw_x
+            state.gaze_y = raw_y
+        else:
+            # Use the Kalman filter to smooth the raw data
+            state.kalman_x.predict()
+            state.kalman_y.predict()
+            state.kalman_x.update(raw_x)
+            state.kalman_y.update(raw_y)
+
+            # Get the smoothed gaze position from the filters
+            state.gaze_x = int(state.kalman_x.get_smoothed_position())
+            state.gaze_y = int(state.kalman_y.get_smoothed_position())
+
         state.last_gaze_time = time.time()
         state.gaze_lost = False
 
@@ -62,3 +75,24 @@ def is_user_tracking_object(tolerance=config.GAZE_TOLERANCE):
     """Returns True if the gaze is close enough to the tracked object center."""
     dist = math_utils.distance(state.gaze_x, state.gaze_y, state.target_x, state.target_y)
     return dist < tolerance
+
+
+def setup_kalman_filters(initial_x, initial_y):
+    """
+    Initializes the Kalman filters for gaze smoothing.
+    This function should be called once at the start of the application.
+    """
+    # Create an instance of the KalmanFilter for the X coordinate
+    # The noise values should be tuned based on how "jittery" the raw data is.
+    state.kalman_x = kalman_filter.KalmanFilter(
+        initial_position=initial_x,
+        process_noise=config.GAZE_PROCESS_NOISE_COV,
+        measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV
+    )
+
+    # Create a separate instance for the Y coordinate
+    state.kalman_y = kalman_filter.KalmanFilter(
+        initial_position=initial_y,
+        process_noise=config.GAZE_PROCESS_NOISE_COV,
+        measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV
+    )

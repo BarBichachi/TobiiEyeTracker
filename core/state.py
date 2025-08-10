@@ -6,6 +6,7 @@
 # ---------------------- Gaze & Target ----------------------
 gaze_x, gaze_y = 0, 0
 target_x, target_y = 0, 0
+kalman_x, kalman_y = None, None
 
 # ---------------------- Pupil (Both Eyes) ----------------------
 left_pupil_diameter = 0.0

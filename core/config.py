@@ -21,6 +21,10 @@ BEEP_TIMEOUT_SECONDS = 5
 BUTTON_DWELL_SECONDS = 1
 BUTTON_PRESSED_COOLDOWN = 2.0
 
+# --- Kalman Filter Tuning ---
+GAZE_PROCESS_NOISE_COV = 0.1
+GAZE_MEASUREMENT_NOISE_COV = 20.0
+
 # ---------------------- Attention Label ----------------------
 ATTENTION_LABEL = {
     "text": "Are you still here?",
