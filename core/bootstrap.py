@@ -75,7 +75,8 @@ def start():
         state.screen_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         # Center tracking mode label
-        config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 180, 50)
+        config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
+        config.TRACKING_LOCK_LABEL["org"] = (int(state.screen_width // 2) - 150, 90)
 
         # Center button under it
         button_width = config.BUTTON_RECT["w"]

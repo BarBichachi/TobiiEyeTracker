@@ -29,10 +29,8 @@ def on_gaze_data(data):
         raw_x = int(avg_x * state.screen_width)
         raw_y = int(avg_y * state.screen_height)
 
-        # Check if the Kalman filters have been initialized
-        if state.kalman_x is None:
-            # First-run logic: initialize filters and set initial gaze, then return.
-            # The actual smoothing will start on the next data point.
+        # Check if the Kalman filters have not been initialized - initialize at first-run
+        if state.kalman_x or state.kalman_y is None:
             setup_kalman_filters(raw_x, raw_y)
             state.gaze_x = raw_x
             state.gaze_y = raw_y
@@ -66,15 +64,19 @@ def on_gaze_data(data):
         state.right_pupil_diameter = 0.0
 
 
-def is_gaze_on_rect(rect):
-    """Returns True if the gaze point is within the given rectangle."""
-    return (rect["x"] <= state.gaze_x <= rect["x"] + rect["w"] and
-            rect["y"] <= state.gaze_y <= rect["y"] + rect["h"])
+def is_gaze_on_rect(rect, offset=0):
+    """Returns True if the gaze point is within the given rectangle, adjusted by offset."""
+    x_min = rect["x"] - offset
+    y_min = rect["y"] - offset
+    x_max = rect["x"] + rect["w"] + offset
+    y_max = rect["y"] + rect["h"] + offset
 
-def is_user_tracking_object(tolerance=config.GAZE_TOLERANCE):
+    return (x_min <= state.gaze_x <= x_max) and (y_min <= state.gaze_y <= y_max)
+
+def is_user_tracking_object():
     """Returns True if the gaze is close enough to the tracked object center."""
     dist = math_utils.distance(state.gaze_x, state.gaze_y, state.target_x, state.target_y)
-    return dist < tolerance
+    return dist < config.GAZE_TARGET_TOLERANCE
 
 
 def setup_kalman_filters(initial_x, initial_y):

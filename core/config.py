@@ -12,7 +12,8 @@ VAL_MIN, VAL_MAX = 0, 255
 IS_GRAYSCALE = False
 
 # ---------------------- Gaze Thresholds ----------------------
-GAZE_TOLERANCE = 50
+GAZE_TARGET_TOLERANCE = 200
+GAZE_BUTTON_TOLERANCE = 50
 X_THRESH = 25
 Y_THRESH = 25
 R_THRESH = (X_THRESH ** 2 + Y_THRESH ** 2) ** 0.5
@@ -20,6 +21,8 @@ GAZE_TIMEOUT_SECONDS = 3
 BEEP_TIMEOUT_SECONDS = 5
 BUTTON_DWELL_SECONDS = 1
 BUTTON_PRESSED_COOLDOWN = 2.0
+RIGHT_EYE_CLOSURE_SECONDS = 1.0
+LEFT_EYE_CLOSURE_SECONDS = 1.0 # CURRENTLY NOT IN USE
 
 # --- Kalman Filter Tuning ---
 GAZE_PROCESS_NOISE_COV = 0.1
@@ -65,9 +68,25 @@ BUTTON_LABEL = {
 }
 BUTTON_PROGRESS_COLOR = (100, 200, 100)
 
+# ---------------------- Tracking Lock ----------------------
+TRACKING_LOCK_LABEL = {
+    "text": "Tracking Lock: OFF",
+    "org": (300, 80),
+    "fontFace": cv2.FONT_HERSHEY_SIMPLEX,
+    "fontScale": 1,
+    "color": (255, 255, 0),
+    "thickness": 2,
+    "lineType": cv2.LINE_AA,
+}
+
 # ---------------------- Asset Paths ----------------------
 USER_MODE_SOUND = Path("assets/sounds/user_mode.wav")
 COMPUTER_MODE_SOUND = Path("assets/sounds/computer_mode.wav")
 USER_NOT_HERE_SOUND = Path("assets/sounds/user_not_here.wav")
 BUTTON_PRESSED_SOUND = Path("assets/sounds/button_pressed.wav")
+TRACKING_LOCK_ENABLED_SOUND = Path("assets/sounds/tracking_lock_enabled.wav")
+TRACKING_LOCK_DISABLED_SOUND = Path("assets/sounds/tracking_lock_disabled.wav")
+COGNITIVE_AID_ENABLED_SOUND = Path("assets/sounds/cognitive_aid_enabled.wav")
+COGNITIVE_AID_DISABLED_SOUND = Path("assets/sounds/cognitive_aid_disabled.wav")
+
 DEFAULT_VIDEO = Path("assets/videos/RocketWC.mp4")

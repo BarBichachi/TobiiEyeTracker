@@ -24,14 +24,16 @@ screen_height = 0
 timestamp = 0
 last_gaze_time = 0
 last_user_not_here_beep_time = 0
-last_button_press_time = 0
 button_dwell_start_time = None
 current_button_progress = 0.0
+right_eye_close_start_time = None
+left_eye_close_start_time = None
 
 # ---------------------- Status Flags ----------------------
 gaze_lost = False
 user_is_tracking = False
 current_gaze_mode = None
+tracking_lock = False
 
 # ---------------------- UI References ----------------------
 graph_window = None
