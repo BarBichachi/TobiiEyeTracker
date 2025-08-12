@@ -114,6 +114,7 @@ def _update_tracking_mode(current_time):
         if state.current_gaze_mode != "user":
             sound.play_user_mode_sound()
             state.current_gaze_mode = "user"
+            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 190, 50)
 
         _set_tracking_label("User", (0, 255, 0))
 
@@ -123,6 +124,7 @@ def _update_tracking_mode(current_time):
         if state.current_gaze_mode != "computer":
             sound.play_computer_mode_sound()
             state.current_gaze_mode = "computer"
+            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
 
         _set_tracking_label("Computer", (0, 0, 255))
 

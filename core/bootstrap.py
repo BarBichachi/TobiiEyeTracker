@@ -76,13 +76,13 @@ def start():
 
         # Center tracking mode label
         config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
-        config.TRACKING_LOCK_LABEL["org"] = (int(state.screen_width // 2) - 150, 90)
+        config.TRACKING_LOCK_LABEL["org"] = (int(state.screen_width // 2) - 150, 110)
 
         # Center button under it
         button_width = config.BUTTON_RECT["w"]
         button_height = config.BUTTON_RECT["h"]
         config.BUTTON_RECT["x"] = int(state.screen_width // 2 - button_width // 2)
-        config.BUTTON_RECT["y"] = config.TRACKING_MODE_LABEL["org"][1] + 60
+        config.BUTTON_RECT["y"] = config.TRACKING_MODE_LABEL["org"][1] + 100
 
         # Adjust label position inside the button
         config.BUTTON_LABEL["org"] = (
@@ -110,7 +110,7 @@ def start():
     except Exception as e:
         print(f"[Startup Error] {e}")
 
-# --- Tobii cleanup helper (closure holds a strong ref to tracker) ---
+# --- Tobii cleanup helper ---
 def _make_tobii_shutdown(tracker):
     """Explicitly unsubscribe from Tobii streams to avoid __del__ errors on exit."""
     def _safe_shutdown():

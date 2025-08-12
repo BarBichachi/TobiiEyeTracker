@@ -12,7 +12,7 @@ VAL_MIN, VAL_MAX = 0, 255
 IS_GRAYSCALE = False
 
 # ---------------------- Gaze Thresholds ----------------------
-GAZE_TARGET_TOLERANCE = 200
+GAZE_TARGET_TOLERANCE = 250
 GAZE_BUTTON_TOLERANCE = 50
 X_THRESH = 25
 Y_THRESH = 25
@@ -26,14 +26,14 @@ LEFT_EYE_CLOSURE_SECONDS = 1.0 # CURRENTLY NOT IN USE
 
 # --- Kalman Filter Tuning ---
 GAZE_PROCESS_NOISE_COV = 0.1
-GAZE_MEASUREMENT_NOISE_COV = 20.0
+GAZE_MEASUREMENT_NOISE_COV = 50.0
 
 # ---------------------- Attention Label ----------------------
 ATTENTION_LABEL = {
     "text": "Are you still here?",
     "org": (40, 80),
     "fontFace": cv2.FONT_HERSHEY_DUPLEX,
-    "fontScale": 2,
+    "fontScale": 1,
     "color": (0, 0, 255),
     "thickness": 2,
     "lineType": cv2.LINE_AA,
@@ -71,7 +71,7 @@ BUTTON_PROGRESS_COLOR = (100, 200, 100)
 # ---------------------- Tracking Lock ----------------------
 TRACKING_LOCK_LABEL = {
     "text": "Tracking Lock: OFF",
-    "org": (300, 80),
+    "org": (0, 0),
     "fontFace": cv2.FONT_HERSHEY_SIMPLEX,
     "fontScale": 1,
     "color": (255, 255, 0),

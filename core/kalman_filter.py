@@ -12,7 +12,7 @@ class KalmanFilter:
     The state is a 2x1 vector [position, velocity].
 
     The filter has a "predict" step where it estimates the next state
-    based on the previous state and a "update" step where it corrects
+    based on the previous state and an "update" step where it corrects
     that estimate based on the new measurement.
     """
 

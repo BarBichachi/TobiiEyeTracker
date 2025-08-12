@@ -39,7 +39,7 @@ def draw_button_overlay(frame):
         frame,
         (btn["x"], btn["y"]),
         (btn["x"] + btn["w"], btn["y"] + btn["h"]),
-        (100, 100, 255), 2
+        (255, 0, 0), 2
     )
 
     # Progress fill (0..1)
