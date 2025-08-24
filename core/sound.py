@@ -13,6 +13,7 @@ _tracking_lock_enabled_sound = sa.WaveObject.from_wave_file(str(config.TRACKING_
 _tracking_lock_disabled_sound = sa.WaveObject.from_wave_file(str(config.TRACKING_LOCK_DISABLED_SOUND))
 _cognitive_aid_enabled_sound = sa.WaveObject.from_wave_file(str(config.COGNITIVE_AID_ENABLED_SOUND))
 _cognitive_aid_disabled_sound = sa.WaveObject.from_wave_file(str(config.COGNITIVE_AID_DISABLED_SOUND))
+_switched_target_sound = sa.WaveObject.from_wave_file(str(config.SWITCHED_TARGET_SOUND))
 
 def play_user_mode_sound():
     _user_sound.play()
@@ -37,3 +38,6 @@ def play_cognitive_aid_enabled_sound():
 
 def play_cognitive_aid_disabled_sound():
     _cognitive_aid_disabled_sound.play()
+
+def play_switched_target_sound():
+    _switched_target_sound.play()

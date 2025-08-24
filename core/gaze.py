@@ -65,13 +65,24 @@ def on_gaze_data(data):
 
 
 def is_gaze_on_rect(rect, offset=0):
-    """Returns True if the gaze point is within the given rectangle, adjusted by offset."""
-    x_min = rect["x"] - offset
-    y_min = rect["y"] - offset
-    x_max = rect["x"] + rect["w"] + offset
-    y_max = rect["y"] + rect["h"] + offset
+    """ True if gaze point is inside rect (±offset).
+    `rect` can be dict {x,y,w,h} or tuple/list (x,y,w,h)."""
+
+    if isinstance(rect, dict):
+        x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
+    else:
+        x, y, w, h = rect
+
+    if not (math_utils.isfinite(state.gaze_x) and math_utils.isfinite(state.gaze_y)):
+        return False
+
+    x_min = x - offset
+    y_min = y - offset
+    x_max = x + w + offset
+    y_max = y + h + offset
 
     return (x_min <= state.gaze_x <= x_max) and (y_min <= state.gaze_y <= y_max)
+
 
 def is_user_tracking_object():
     """Returns True if the gaze is close enough to the tracked object center."""

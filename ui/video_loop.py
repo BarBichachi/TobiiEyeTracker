@@ -3,23 +3,26 @@
 # gaze detection, tracking state updates, interaction logic, and UI rendering.
 
 import time
+import traceback
+
 import cv2
 import numpy as np
 
-from core import state, config, sound, gaze
+from core import state, config, sound, gaze, targeting, math_utils
 from ui import render, eye_overlay
 
 # ---------------------- Video Display Loop ----------------------
 def show_video(cap, wait_time, app):
     paused = False
     frame = None
-    tracking_label = config.TRACKING_MODE_LABEL
     cv2.namedWindow('Main Window', cv2.WINDOW_NORMAL)
 
-    # --- Sticky bbox (local): reuse last box briefly to avoid flicker ---
-    last_bbox = None
-    last_bbox_time = 0.0
-    box_stale_seconds = 0.3
+    # --- Focus & Latched variables ---
+    focused_idx = None
+    focused_ts = 0.0
+    latched_anchor = None
+    latched_seen_ts = 0.0
+    latched_idx = None
 
     try:
         while True:
@@ -30,30 +33,17 @@ def show_video(cap, wait_time, app):
                     print("Warning: Frame read failed.")
                     continue
 
+            # --- Perceive current frame time ---
             current_time = time.time()
-            bbox = None
 
             # --- Build the processing mask ---
             mask_raw = _build_processing_mask(frame)
 
             # --- Find contours from the ORIGINAL mask ---
             contours, _ = cv2.findContours(mask_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if contours:
-                x, y, w, h = _extract_largest_bbox(contours)
-                bbox = (x, y, w, h)
-                last_bbox = bbox
-                last_bbox_time = current_time
 
-                # --- Retrieves the center of the target ---
-                state.target_x, state.target_y = x + w // 2, y + h // 2
-
-                # --- Update mode/label/sounds based on current gaze state ---
-                if not state.tracking_lock:
-                    _update_tracking_mode(current_time)
-            else:
-                # --- Sticky reuse: keep last box for a short grace period ---
-                if last_bbox and (current_time - last_bbox_time) < box_stale_seconds:
-                    bbox = last_bbox
+            # --- Extract list of targets ---
+            targets = _extract_targets(contours)
 
             # --- Choose a canvas to draw UI on (mask visualization OR color) ---
             canvas = cv2.cvtColor(mask_raw, cv2.COLOR_GRAY2BGR) if config.IS_GRAYSCALE else frame.copy()
@@ -65,7 +55,7 @@ def show_video(cap, wait_time, app):
             render.draw_gaze_point(canvas)
 
             # --- Show mode label (User / Computer) ---
-            render.draw_tracking_label(canvas, tracking_label)
+            render.draw_tracking_label(canvas, config.TRACKING_MODE_LABEL)
 
             # --- Attention prompt & beep ---
             _handle_attention_timeout(canvas, current_time)
@@ -74,13 +64,47 @@ def show_video(cap, wait_time, app):
             render.draw_button_overlay(canvas)
             _handle_gaze_button_interaction(current_time)
 
-            # --- Draw left and right pupil indicators (fixed position) ---
+            # --- Draw pupils (fixed position) ---
             eye_overlay.draw_pupil(canvas, state.left_pupil_diameter, state.left_pupil_position)
             eye_overlay.draw_pupil(canvas, state.right_pupil_diameter, state.right_pupil_position)
 
-            # --- Draw tracking box on target if we have one and tracking mode is not computer ---
-            if bbox is not None and not state.user_is_tracking:
-                render.draw_tracking_overlay(canvas, bbox, tracking_label["color"])
+            # --- Resolve which target the user is actually looking at ---
+            gaze_xy = targeting.gaze_point_or_none()
+
+            # --- Run focus selection with sticky policy ---
+            focused_idx, focused_ts, focus_from_sticky = (targeting.update_focus
+                (targets=targets, focused_idx=focused_idx, focused_ts=focused_ts, now=current_time, gaze_xy=gaze_xy))
+
+            # --- Remember latched idx from previous frame ---
+            prev_latched_idx = latched_idx
+
+            # --- Blink to latch (left eye) ---
+            left_blinked = _detect_eye_closure("LEFT", config.LEFT_EYE_CLOSURE_SECONDS, current_time)
+            did_request_latch = left_blinked and (focused_idx is not None)
+
+            if did_request_latch:
+                latched_anchor = targeting.make_latch_anchor(targets[focused_idx])
+
+            # --- Re-identify the latched target & apply loss sticky ---
+            latched_anchor, latched_idx, latched_seen_ts = targeting.track_latched(latched_anchor, targets, latched_seen_ts, current_time)
+
+            # --- Audio feedback: only when a latch was requested and target actually changed ---
+            if did_request_latch:
+                if latched_idx is not None and (prev_latched_idx is None or latched_idx != prev_latched_idx):
+                    sound.play_switched_target_sound()
+
+            # --- Publish current target center for downstream consumers ---
+            targeting.update_state_target_xy(targets, focused_idx, latched_idx, latched_anchor)
+
+            state.has_latch = (latched_anchor is not None and latched_idx is not None)
+            state.gaze_on_latched = state.has_latch and (focused_idx == latched_idx)
+
+            # --- Update mode/label/sounds ---
+            if not state.tracking_lock:
+                _update_tracking_mode(current_time)
+
+            # --- Draw overlays according to rules (green = real focus, red = latched when not gazed) ---
+            targeting.draw_focus_and_latch(canvas, targets, focused_idx, focus_from_sticky, latched_anchor, latched_idx)
 
             # --- Display ---
             cv2.imshow('Main Window', canvas)
@@ -90,43 +114,51 @@ def show_video(cap, wait_time, app):
             if new_paused is None:
                 break
             paused = new_paused
-
+    except Exception:
+        print("[FRAME ERROR]\n", traceback.format_exc())
     finally:
         cap.release()
         cv2.destroyAllWindows()
 
 
 # ---------------------- Internal Helpers ----------------------
-def _extract_largest_bbox(contours):
-    """Returns bounding box (x, y, w, h) for the largest contour."""
-    largest = max(contours, key=cv2.contourArea)
-    return cv2.boundingRect(largest)
-
-
 def _update_tracking_mode(current_time):
-    """Determines whether the user is currently tracking the object.
+    """Determines whether the user is currently tracking an object.
     Updates gaze state and plays corresponding mode-change sounds."""
-    if gaze.is_user_tracking_object():
-        state.user_is_tracking = True
+    # Ignore user if tracking lock is ON
+    if state.tracking_lock:
+        tracking_now = False
+    else:
+        # Only allow 'user' if we actually have a target this frame AND gaze is valid
+        gx_ok = math_utils.isfinite(state.gaze_x) and math_utils.isfinite(state.gaze_y)
+        tracking_now = bool(state.target_present) and gx_ok and gaze.is_user_tracking_object()
+
+    state.user_is_tracking = tracking_now
+    if tracking_now:
         state.last_gaze_time = current_time
         state.gaze_lost = False
-
-        if state.current_gaze_mode != "user":
-            sound.play_user_mode_sound()
-            state.current_gaze_mode = "user"
-            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 190, 50)
-
-        _set_tracking_label("User", (0, 255, 0))
-
+        desired_mode = "user"
     else:
-        state.user_is_tracking = False
+        desired_mode = "computer"
 
-        if state.current_gaze_mode != "computer":
-            sound.play_computer_mode_sound()
-            state.current_gaze_mode = "computer"
-            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
+    # --- LATCH GATE: if a latch exists and gaze is NOT on it, freeze the mode on computer ---
+    if state.has_latch and not state.gaze_on_latched:
+        desired_mode = "computer"
 
-        _set_tracking_label("Computer", (0, 0, 255))
+    # --- Rate-limit flips ---
+    if desired_mode != state.current_gaze_mode:
+        if (current_time - state.last_mode_switch_time) >= config.MODE_SWITCH_COOLDOWN_S:
+            state.current_gaze_mode = desired_mode
+            state.last_mode_switch_time = current_time
+
+            if desired_mode == "user":
+                sound.play_user_mode_sound()
+                config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 190, 50)
+                _set_tracking_label("User", (0, 255, 0))
+            else:
+                sound.play_computer_mode_sound()
+                config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
+                _set_tracking_label("Computer", (0, 0, 255))
 
 
 def _set_tracking_label(mode, color):
@@ -254,3 +286,25 @@ def _handle_tracking_lock_toggle(frame, current_time):
             sound.play_tracking_lock_disabled_sound()
 
     render.draw_tracking_label(frame, config.TRACKING_LOCK_LABEL)
+
+
+def _extract_targets(contours):
+    """Return list of dicts"""
+    items = []
+
+    for c in contours:
+        area = cv2.contourArea(c)
+
+        if area < config.MIN_CONTOUR_AREA:
+            continue
+
+        x, y, w, h = cv2.boundingRect(c)
+        items.append({
+            "bbox": (x, y, w, h),
+            "center": (x + w // 2, y + h // 2),
+            "area": area
+        })
+
+    # biggest first, keep a cap for perf/flicker control
+    items.sort(key=lambda t: t["area"], reverse=True)
+    return items[:config.MAX_TARGETS_CONSIDERED]

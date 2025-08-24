@@ -17,3 +17,5 @@ def safe_average(a, b):
     elif math.isnan(b):
         return a
     return (a + b) / 2
+
+def isfinite(x): return isinstance(x, (int, float)) and math.isfinite(x)

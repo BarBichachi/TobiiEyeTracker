@@ -25,15 +25,20 @@ timestamp = 0
 last_gaze_time = 0
 last_user_not_here_beep_time = 0
 button_dwell_start_time = None
-current_button_progress = 0.0
+current_button_progress = 0
 right_eye_close_start_time = None
 left_eye_close_start_time = None
+last_mode_switch_time = 0
+last_target_ts = 0
 
 # ---------------------- Status Flags ----------------------
 gaze_lost = False
 user_is_tracking = False
 current_gaze_mode = None
 tracking_lock = False
+has_latch = False
+gaze_on_latched = False
+target_present = False
 
 # ---------------------- UI References ----------------------
 graph_window = None

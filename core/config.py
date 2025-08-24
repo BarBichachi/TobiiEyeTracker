@@ -22,11 +22,19 @@ BEEP_TIMEOUT_SECONDS = 5
 BUTTON_DWELL_SECONDS = 1
 BUTTON_PRESSED_COOLDOWN = 2.0
 RIGHT_EYE_CLOSURE_SECONDS = 1.0
-LEFT_EYE_CLOSURE_SECONDS = 1.0 # CURRENTLY NOT IN USE
+LEFT_EYE_CLOSURE_SECONDS = 1.0
+FOCUS_STICKY_SECONDS = 0.25
+MIN_CONTOUR_AREA = 150
+MAX_TARGETS_CONSIDERED = 5
+MODE_SWITCH_COOLDOWN_S = 2
 
 # --- Kalman Filter Tuning ---
 GAZE_PROCESS_NOISE_COV = 0.1
 GAZE_MEASUREMENT_NOISE_COV = 50.0
+
+# --- Latch targets ---
+MAX_REID_DIST_PX = 120
+LATCH_STICKY_SECONDS = 0.2
 
 # ---------------------- Attention Label ----------------------
 ATTENTION_LABEL = {
@@ -88,5 +96,6 @@ TRACKING_LOCK_ENABLED_SOUND = Path("assets/sounds/tracking_lock_enabled.wav")
 TRACKING_LOCK_DISABLED_SOUND = Path("assets/sounds/tracking_lock_disabled.wav")
 COGNITIVE_AID_ENABLED_SOUND = Path("assets/sounds/cognitive_aid_enabled.wav")
 COGNITIVE_AID_DISABLED_SOUND = Path("assets/sounds/cognitive_aid_disabled.wav")
+SWITCHED_TARGET_SOUND = Path("assets/sounds/switched_target.wav")
 
-DEFAULT_VIDEO = Path("assets/videos/RocketWC.mp4")
+DEFAULT_VIDEO = Path("assets/videos/cloud_balls_black_60s.mp4")
