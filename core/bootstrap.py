@@ -6,13 +6,14 @@ import threading
 import time
 import math
 import cv2
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 import tobii_research as tr
 import numpy as np
 import atexit
 
 from core import state, config, gaze
 from ui import video_loop, trackbars, live_graphs
+from core.mock_eye_tracker import MockEyeTracker
 
 
 # ---------------------- Periodic Graph Updater ----------------------
@@ -50,9 +51,11 @@ def start():
         # Find and connect to eye tracker
         eyetrackers = tr.find_all_eyetrackers()
         if not eyetrackers:
-            raise RuntimeError("No eye tracker found.")
+            print("[Startup] No eye tracker found. Using MockEyeTracker.")
+            tracker = MockEyeTracker(i_Hz=120)
+        else:
+            tracker = eyetrackers[0]
 
-        tracker = eyetrackers[0]
         tracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data, as_dictionary=True)
 
         # Ensure we always unsubscribe before process exit

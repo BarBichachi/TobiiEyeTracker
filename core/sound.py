@@ -16,10 +16,12 @@ _cognitive_aid_disabled_sound = sa.WaveObject.from_wave_file(str(config.COGNITIV
 _switched_target_sound = sa.WaveObject.from_wave_file(str(config.SWITCHED_TARGET_SOUND))
 
 def play_user_mode_sound():
-    _user_sound.play()
+    # _user_sound.play()
+    print("User mode sound is muted")
 
 def play_computer_mode_sound():
-    _computer_sound.play()
+    # _computer_sound.play()
+    print("Computer mode sound is muted")
 
 def play_user_not_here_sound():
     _user_not_here_sound.play()

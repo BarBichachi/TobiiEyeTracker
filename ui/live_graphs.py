@@ -2,7 +2,7 @@ import os
 from datetime import datetime, time
 import numpy as np
 import pyqtgraph as pg
-from PyQt5.QtWidgets import (QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout)
+from PySide6.QtWidgets import QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout
 
 class LiveGraphs(QWidget):
     """ Real-time graphs with live stats and CSV export. """

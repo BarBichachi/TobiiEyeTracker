@@ -30,7 +30,7 @@ def on_gaze_data(data):
         raw_y = int(avg_y * state.screen_height)
 
         # Check if the Kalman filters have not been initialized - initialize at first-run
-        if state.kalman_x or state.kalman_y is None:
+        if state.kalman_x is None or state.kalman_y is None:
             setup_kalman_filters(raw_x, raw_y)
             state.gaze_x = raw_x
             state.gaze_y = raw_y
