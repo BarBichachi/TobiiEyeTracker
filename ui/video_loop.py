@@ -106,7 +106,6 @@ def _create_canvas(frame, mask_raw):
 def _render_common_overlays(canvas, now):
     _handle_tracking_lock_toggle(canvas, now)
 
-    # Currently not drawing gaze point (the green circle)
     render.draw_gaze_point(canvas)
     render.draw_label(canvas, config.TRACKING_MODE_LABEL)
 
