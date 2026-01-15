@@ -1,9 +1,13 @@
 # render.py
 # Drawing utilities for gaze overlays, tracking indicators, attention prompts, and on-screen UI widgets.
-
+import time
 import cv2
 
-from core import config, math_utils, state
+from core import config, entropy, math_utils, state
+from ui.gaze_trail import GazeTrail
+
+_entropy_tracker = entropy.EntropyTracker(window_s=1.5, min_samples=5)
+_gaze_trail = GazeTrail(decay=0.98, sigma=25.0)
 
 
 # Draws a gaze marker at the current gaze position (if valid)
@@ -63,3 +67,24 @@ def draw_button_overlay(frame):
         cv2.rectangle(frame, (x, y), (x + fill_w, y + h), config.BUTTON_PROGRESS_COLOR, thickness=-1)
 
     draw_label(frame, config.BUTTON_LABEL)
+
+
+# Draws a smooth gaze trail and a live entropy label based on gaze error vs target
+def draw_gaze_trail_and_entropy(frame):
+    now_t = time.perf_counter()
+
+    gx, gy = state.gaze_x, state.gaze_y
+    tx, ty = state.target_x, state.target_y
+
+    valid_gaze = math_utils.isfinite(gx) and math_utils.isfinite(gy)
+    valid_target = math_utils.isfinite(tx) and math_utils.isfinite(ty)
+
+    _entropy_tracker.add_sample(gx if valid_gaze else 0.0, gy if valid_gaze else 0.0, valid_gaze, tx if valid_target else None, ty if valid_target else None, t=now_t)
+
+    _gaze_trail.update(frame, gx, gy, valid_gaze)
+    _gaze_trail.draw(frame)
+
+    c = _entropy_tracker.get_error_entropy(grid=16, t=now_t)
+    text = f"Consistency: {1.0 - c:.2f}" if c is not None else "Consistency: --"
+
+    cv2.putText(frame, text, (14, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)

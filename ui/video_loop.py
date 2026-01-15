@@ -50,6 +50,8 @@ def show_video(cap, wait_time_ms, app):
             targeting.update_state_target_xy(targets, focus_state["focused_idx"], latch_state["latched_idx"], latch_state["latched_anchor"])
             _update_latch_flags(focus_state["focused_idx"], latch_state)
 
+            render.draw_gaze_trail_and_entropy(canvas)
+
             if not state.tracking_lock:
                 _update_tracking_mode(now)
 
@@ -104,7 +106,8 @@ def _create_canvas(frame, mask_raw):
 def _render_common_overlays(canvas, now):
     _handle_tracking_lock_toggle(canvas, now)
 
-    render.draw_gaze_point(canvas)
+    # Currently not drawing gaze point (the green circle)
+    # render.draw_gaze_point(canvas)
     render.draw_label(canvas, config.TRACKING_MODE_LABEL)
 
     _handle_attention_timeout(canvas, now)
