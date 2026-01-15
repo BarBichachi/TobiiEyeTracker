@@ -1,27 +1,61 @@
 # trackbars.py
-# OpenCV trackbar handlers for HSV and grayscale filtering thresholds.
-# These update shared config values in real-time for object segmentation.
+# OpenCV trackbars for live tuning of HSV segmentation and grayscale mode.
 
-import core.config as config
 import cv2
 
-# ---------------------- Trackbar Handlers ----------------------
-def on_trackbar_hue_min(val):   config.HUE_MIN = val
-def on_trackbar_hue_max(val):   config.HUE_MAX = val
-def on_trackbar_sat_min(val):   config.SAT_MIN = val
-def on_trackbar_sat_max(val):   config.SAT_MAX = val
-def on_trackbar_val_min(val):   config.VAL_MIN = val
-def on_trackbar_val_max(val):   config.VAL_MAX = val
-def on_trackbar_grayscale(val): config.IS_GRAYSCALE = bool(val)
+from core import config
 
-# ---------------------- Trackbar Setup ----------------------
+
+_TRACKBAR_WINDOW = "Trackbars"
+
+
+# Updates HSV minimum hue threshold
+def _on_hue_min(value):
+    config.HUE_MIN = int(value)
+
+
+# Updates HSV maximum hue threshold
+def _on_hue_max(value):
+    config.HUE_MAX = int(value)
+
+
+# Updates HSV minimum saturation threshold
+def _on_sat_min(value):
+    config.SAT_MIN = int(value)
+
+
+# Updates HSV maximum saturation threshold
+def _on_sat_max(value):
+    config.SAT_MAX = int(value)
+
+
+# Updates HSV minimum value (brightness) threshold
+def _on_val_min(value):
+    config.VAL_MIN = int(value)
+
+
+# Updates HSV maximum value (brightness) threshold
+def _on_val_max(value):
+    config.VAL_MAX = int(value)
+
+
+# Toggles grayscale processing mode
+def _on_grayscale_toggle(value):
+    config.IS_GRAYSCALE = bool(value)
+
+
+# Creates and initializes all OpenCV trackbars
 def create_trackbars():
-    cv2.namedWindow('Trackbar', cv2.WINDOW_NORMAL)
+    cv2.namedWindow(_TRACKBAR_WINDOW, cv2.WINDOW_NORMAL)
 
-    cv2.createTrackbar('Hue Min',   'Trackbar',  0, config.HUE_MAX,  on_trackbar_hue_min)
-    cv2.createTrackbar('Hue Max',   'Trackbar', 15, config.HUE_MAX,  on_trackbar_hue_max)
-    cv2.createTrackbar('Sat Min',   'Trackbar',  0, config.SAT_MAX,  on_trackbar_sat_min)
-    cv2.createTrackbar('Sat Max',   'Trackbar', 255, config.SAT_MAX, on_trackbar_sat_max)
-    cv2.createTrackbar('Val Min',   'Trackbar',  0, config.VAL_MAX,  on_trackbar_val_min)
-    cv2.createTrackbar('Val Max',   'Trackbar', 40, config.VAL_MAX,  on_trackbar_val_max)
-    cv2.createTrackbar('Grayscale', 'Trackbar',  0, 1,         on_trackbar_grayscale)
+    # NOTE: initial values are intentional and tuned
+    cv2.createTrackbar("Hue Min", _TRACKBAR_WINDOW, 0,   179, _on_hue_min)
+    cv2.createTrackbar("Hue Max", _TRACKBAR_WINDOW, 15,  179, _on_hue_max)
+
+    cv2.createTrackbar("Sat Min", _TRACKBAR_WINDOW, 0,   255, _on_sat_min)
+    cv2.createTrackbar("Sat Max", _TRACKBAR_WINDOW, 255, 255, _on_sat_max)
+
+    cv2.createTrackbar("Val Min", _TRACKBAR_WINDOW, 0,   255, _on_val_min)
+    cv2.createTrackbar("Val Max", _TRACKBAR_WINDOW, 40,  255, _on_val_max)
+
+    cv2.createTrackbar("Grayscale", _TRACKBAR_WINDOW, 0, 1, _on_grayscale_toggle)

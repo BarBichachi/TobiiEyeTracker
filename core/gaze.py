@@ -1,77 +1,37 @@
 # gaze.py
-# Handles gaze data callback from the Tobii SDK and related gaze computations.
-# This includes real-time screen coordinate updates based on eye tracker input,
-# as well as utility functions to determine gaze interaction with on-screen elements.
+# Processes gaze samples from the eye tracker and updates shared runtime state.
+# Provides helper functions for gaze interaction checks (rect hit-test, target tracking).
+
 import math
-from datetime import datetime
 import time
-from core import state, math_utils, config, kalman_filter
+from datetime import datetime
 
+from core import config, kalman_filter, math_utils, state
+
+
+# Handles gaze callback: smooth gaze with Kalman, update state, and track pupil diameters
 def on_gaze_data(data):
-    """Callback from Tobii: smooth gaze with Kalman, update state, handle pupils."""
-    # --- Timestamp (seconds within day) ---
     now = datetime.now()
-    state.timestamp = (
-        now.hour * 3600_000 +
-        now.minute * 60_000 +
-        now.second * 1_000 +
-        now.microsecond // 1_000
-    ) / 1000
+    state.timestamp = (now.hour * 3600_000 + now.minute * 60_000 + now.second * 1_000 + now.microsecond // 1_000) / 1000.0
 
-    # --- Read raw gaze (normalized 0..1) ---
-    lx, ly = data['left_gaze_point_on_display_area']
-    rx, ry = data['right_gaze_point_on_display_area']
-    avg_x = math_utils.safe_average(lx, rx)
-    avg_y = math_utils.safe_average(ly, ry)
+    avg_x, avg_y = _extract_avg_gaze(data)
+    if avg_x is None or avg_y is None:
+        state.gaze_lost = True
+        _update_pupils(data)
+        return
 
-    # Convert to pixel coordinates using video frame dimensions
-    if avg_x is not None and avg_y is not None:
-        raw_x = int(avg_x * state.screen_width)
-        raw_y = int(avg_y * state.screen_height)
+    raw_x, raw_y = _to_pixel_coords(avg_x, avg_y)
+    _update_kalman_and_state(raw_x, raw_y)
 
-        # Check if the Kalman filters have not been initialized - initialize at first-run
-        if state.kalman_x is None or state.kalman_y is None:
-            setup_kalman_filters(raw_x, raw_y)
-            state.gaze_x = raw_x
-            state.gaze_y = raw_y
-        else:
-            # Use the Kalman filter to smooth the raw data
-            state.kalman_x.predict()
-            state.kalman_y.predict()
-            state.kalman_x.update(raw_x)
-            state.kalman_y.update(raw_y)
+    state.last_gaze_time = time.time()
+    state.gaze_lost = False
 
-            # Get the smoothed gaze position from the filters
-            state.gaze_x = int(state.kalman_x.get_smoothed_position())
-            state.gaze_y = int(state.kalman_y.get_smoothed_position())
-
-        state.last_gaze_time = time.time()
-        state.gaze_lost = False
-
-    # Check if pupil diameter data is valid and get it
-    # LEFT EYE
-    left_diameter = data.get('left_pupil_diameter', 0.0)
-    if data.get('left_pupil_validity') == 1 and not math.isnan(left_diameter):
-        state.left_pupil_diameter = left_diameter
-    else:
-        state.left_pupil_diameter = 0.0
-
-    # RIGHT EYE
-    right_diameter = data.get('right_pupil_diameter', 0.0)
-    if data.get('right_pupil_validity') == 1 and not math.isnan(right_diameter):
-        state.right_pupil_diameter = right_diameter
-    else:
-        state.right_pupil_diameter = 0.0
+    _update_pupils(data)
 
 
+# Returns True if gaze point is inside rect (±offset)
 def is_gaze_on_rect(rect, offset=0):
-    """ True if gaze point is inside rect (±offset).
-    `rect` can be dict {x,y,w,h} or tuple/list (x,y,w,h)."""
-
-    if isinstance(rect, dict):
-        x, y, w, h = rect["x"], rect["y"], rect["w"], rect["h"]
-    else:
-        x, y, w, h = rect
+    x, y, w, h = _normalize_rect(rect)
 
     if not (math_utils.isfinite(state.gaze_x) and math_utils.isfinite(state.gaze_y)):
         return False
@@ -81,31 +41,82 @@ def is_gaze_on_rect(rect, offset=0):
     x_max = x + w + offset
     y_max = y + h + offset
 
-    return (x_min <= state.gaze_x <= x_max) and (y_min <= state.gaze_y <= y_max)
+    return x_min <= state.gaze_x <= x_max and y_min <= state.gaze_y <= y_max
 
 
+# Returns True if the gaze is close enough to the tracked object center
 def is_user_tracking_object():
-    """Returns True if the gaze is close enough to the tracked object center."""
     dist = math_utils.distance(state.gaze_x, state.gaze_y, state.target_x, state.target_y)
+    if dist is None:
+        return False
     return dist < config.GAZE_TARGET_TOLERANCE
 
 
+# Initializes the Kalman filters for gaze smoothing
 def setup_kalman_filters(initial_x, initial_y):
-    """
-    Initializes the Kalman filters for gaze smoothing.
-    This function should be called once at the start of the application.
-    """
-    # Create an instance of the KalmanFilter for the X coordinate
-    # The noise values should be tuned based on how "jittery" the raw data is.
-    state.kalman_x = kalman_filter.KalmanFilter(
-        initial_position=initial_x,
-        process_noise=config.GAZE_PROCESS_NOISE_COV,
-        measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV
-    )
+    state.kalman_x = kalman_filter.KalmanFilter(initial_position=initial_x, process_noise=config.GAZE_PROCESS_NOISE_COV, measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV)
+    state.kalman_y = kalman_filter.KalmanFilter(initial_position=initial_y, process_noise=config.GAZE_PROCESS_NOISE_COV, measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV)
 
-    # Create a separate instance for the Y coordinate
-    state.kalman_y = kalman_filter.KalmanFilter(
-        initial_position=initial_y,
-        process_noise=config.GAZE_PROCESS_NOISE_COV,
-        measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV
-    )
+
+# Extracts averaged gaze in display-area coords (0..1) using validity when available
+def _extract_avg_gaze(data):
+    lx, ly = data.get("left_gaze_point_on_display_area", (float("nan"), float("nan")))
+    rx, ry = data.get("right_gaze_point_on_display_area", (float("nan"), float("nan")))
+
+    lv = data.get("left_gaze_point_validity", 1)
+    rv = data.get("right_gaze_point_validity", 1)
+
+    if lv != 1:
+        lx, ly = float("nan"), float("nan")
+    if rv != 1:
+        rx, ry = float("nan"), float("nan")
+
+    avg_x = math_utils.safe_average(lx, rx)
+    avg_y = math_utils.safe_average(ly, ry)
+    return avg_x, avg_y
+
+
+# Converts normalized display-area coords (0..1) into pixel coords using video dimensions
+def _to_pixel_coords(x, y):
+    x = max(0.0, min(1.0, x))
+    y = max(0.0, min(1.0, y))
+    return int(x * state.screen_width), int(y * state.screen_height)
+
+
+# Updates Kalman filters and writes smoothed gaze to state
+def _update_kalman_and_state(raw_x, raw_y):
+    if state.kalman_x is None or state.kalman_y is None:
+        setup_kalman_filters(raw_x, raw_y)
+        state.gaze_x = raw_x
+        state.gaze_y = raw_y
+        return
+
+    state.kalman_x.predict()
+    state.kalman_y.predict()
+    state.kalman_x.update(raw_x)
+    state.kalman_y.update(raw_y)
+
+    state.gaze_x = int(state.kalman_x.get_smoothed_position())
+    state.gaze_y = int(state.kalman_y.get_smoothed_position())
+
+
+# Updates pupil diameters in state based on validity flags
+def _update_pupils(data):
+    left_diameter = data.get("left_pupil_diameter", 0.0)
+    if data.get("left_pupil_validity") == 1 and isinstance(left_diameter, (int, float)) and not math.isnan(left_diameter):
+        state.left_pupil_diameter = float(left_diameter)
+    else:
+        state.left_pupil_diameter = 0.0
+
+    right_diameter = data.get("right_pupil_diameter", 0.0)
+    if data.get("right_pupil_validity") == 1 and isinstance(right_diameter, (int, float)) and not math.isnan(right_diameter):
+        state.right_pupil_diameter = float(right_diameter)
+    else:
+        state.right_pupil_diameter = 0.0
+
+
+# Normalizes rect input (dict or tuple) into (x, y, w, h)
+def _normalize_rect(rect):
+    if isinstance(rect, dict):
+        return rect["x"], rect["y"], rect["w"], rect["h"]
+    return rect

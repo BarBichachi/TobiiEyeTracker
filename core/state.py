@@ -1,45 +1,87 @@
 # state.py
-# Shared mutable runtime state for gaze tracking, attention, and UI behavior.
-# Used to coordinate values across modules without using global declarations.
+# Central shared runtime state for gaze tracking, attention logic, and UI coordination.
+# This module intentionally holds mutable process-wide state accessed by multiple threads.
+
+# region Gaze & Target Coordinates
+# Current smoothed gaze position (pixel coordinates)
+gaze_x = 0
+gaze_y = 0
+
+# Current tracked target position (pixel coordinates)
+target_x = 0
+target_y = 0
+
+# Kalman filters for gaze smoothing (initialized on first gaze sample)
+kalman_x = None
+kalman_y = None
+# endregion
 
 
-# ---------------------- Gaze & Target ----------------------
-gaze_x, gaze_y = 0, 0
-target_x, target_y = 0, 0
-kalman_x, kalman_y = None, None
-
-# ---------------------- Pupil (Both Eyes) ----------------------
+# region Pupil Data
+# Last known pupil diameter values (mm)
 left_pupil_diameter = 0.0
 right_pupil_diameter = 0.0
 
-# Fixed screen positions to render them visually
+# Fixed on-screen positions used only for visualization
 left_pupil_position = (1650, 950)
 right_pupil_position = (1800, 950)
+# endregion
 
-# ---------------------- Screen Dimensions ----------------------
+
+# region Screen & Video
+# Active video frame dimensions (pixels)
 screen_width = 0
 screen_height = 0
+# endregion
 
-# ---------------------- Timestamps ----------------------
-timestamp = 0
-last_gaze_time = 0
-last_user_not_here_beep_time = 0
+
+# region Timing & Interaction
+# Current timestamp (seconds, wall-clock based)
+timestamp = 0.0
+
+# Last time a valid gaze sample was received (epoch seconds)
+last_gaze_time = 0.0
+
+# Last time the "user not here" sound was played
+last_user_not_here_beep_time = 0.0
+
+# Button dwell tracking
 button_dwell_start_time = None
-current_button_progress = 0
+current_button_progress = 0.0
+
+# Eye-closure timing (used for gestures / mode switching)
 right_eye_close_start_time = None
 left_eye_close_start_time = None
-last_mode_switch_time = 0
-last_target_ts = 0
 
-# ---------------------- Status Flags ----------------------
+# Mode / target timing
+last_mode_switch_time = 0.0
+last_target_ts = 0.0
+# endregion
+
+
+# region Status Flags
+# True when no valid gaze is currently detected
 gaze_lost = False
+
+# True when user gaze is actively tracking the target
 user_is_tracking = False
+
+# Current gaze interaction mode (implementation-defined)
 current_gaze_mode = None
+
+# True when tracking lock is enabled
 tracking_lock = False
+
+# Internal latch flags for interaction logic
 has_latch = False
 gaze_on_latched = False
+
+# True when a target is currently present on screen
 target_present = False
+# endregion
 
-# ---------------------- UI References ----------------------
+
+# region UI References
+# Live graph window instance (Qt widget)
 graph_window = None
-
+# endregion

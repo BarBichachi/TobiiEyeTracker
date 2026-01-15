@@ -1,21 +1,37 @@
 # math_utils.py
-# Basic reusable math operations used across gaze, entropy, and distance calculations.
+# Small, defensive math helpers used across gaze processing, distance checks, and entropy calculations.
 
 import math
 
+
+# Returns a - b, or None if inputs are not finite numbers
 def delta(a, b):
+    if not isfinite(a) or not isfinite(b):
+        return None
     return a - b
 
+
+# Returns Euclidean distance between two points, or None if any input is invalid
 def distance(x1, y1, x2, y2):
-    return math.hypot(delta(x1, x2), delta(y1, y2))
-
-def safe_average(a, b):
-    if math.isnan(a) and math.isnan(b):
+    if not all(isfinite(v) for v in (x1, y1, x2, y2)):
         return None
-    elif math.isnan(a):
-        return b
-    elif math.isnan(b):
-        return a
-    return (a + b) / 2
+    return math.hypot(x1 - x2, y1 - y2)
 
-def isfinite(x): return isinstance(x, (int, float)) and math.isfinite(x)
+
+# Returns the average of two values, ignoring invalid inputs
+def safe_average(a, b):
+    a_valid = isfinite(a)
+    b_valid = isfinite(b)
+
+    if not a_valid and not b_valid:
+        return None
+    if not a_valid:
+        return b
+    if not b_valid:
+        return a
+    return (a + b) / 2.0
+
+
+# Returns True if x is a finite int or float
+def isfinite(x):
+    return isinstance(x, (int, float)) and math.isfinite(x)
