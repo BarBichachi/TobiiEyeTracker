@@ -78,25 +78,9 @@ def _print_tracker_info(tracker):
     logger.info("  Serial:  %s", getattr(tracker, "serial_number", "(N/A)"))
 
 
-# Unsubscribes from Tobii streams to avoid exit-time SDK errors
-def _make_tobii_shutdown(tracker):
-    def safe_shutdown():
-        for event, cb in (
-            (tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data),
-            (tr.EYETRACKER_USER_POSITION_GUIDE, positioning.on_user_position_guide),
-        ):
-            try:
-                tracker.unsubscribe_from(event, cb)
-            except Exception:
-                pass
-
-    return safe_shutdown
-
-
 # Starts the runtime: tracker, video, UI, background loops
 def start():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
-    tracker = None
     try:
         sound.set_sound_enabled(config.SOUND_ENABLED)
         if config.SOUND_ENABLED:
@@ -122,18 +106,9 @@ def start():
     except Exception as e:
         logger.exception("Startup error: %s", e)
     finally:
-        # Force a prompt, clean process exit. A normal return can hang because the Tobii
-        # SDK and OpenCV HighGUI keep native (non-daemon) threads alive; os._exit avoids
-        # that (and the exit-time SDK __del__ errors) entirely.
-        _shutdown_tracker(tracker)
+        # Hard-terminate the whole process. A normal return can hang for seconds because the
+        # Tobii SDK (and OpenCV HighGUI) keep native, non-daemon threads alive and the SDK's
+        # unsubscribe call can block. os._exit kills everything immediately and skips Python
+        # finalization, which also avoids the exit-time SDK __del__ errors. The OS reclaims
+        # the tracker connection, windows, and threads.
         os._exit(0)
-
-
-# Best-effort unsubscribe so the device stops streaming before we exit
-def _shutdown_tracker(tracker):
-    if tracker is None:
-        return
-    try:
-        _make_tobii_shutdown(tracker)()
-    except Exception:
-        pass

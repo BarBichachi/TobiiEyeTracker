@@ -2,6 +2,7 @@
 # Runs the real-time video loop: frame acquisition, target extraction, gaze interaction, state updates, and overlay rendering.
 
 import logging
+import os
 import time
 import traceback
 
@@ -270,8 +271,9 @@ def _handle_pause_quit(wait_time_ms, app, paused):
     key = cv2.waitKey(wait_time_ms) & 0xFF
 
     if key == ord("q"):
-        app.quit()  # ends app.exec(); bootstrap's finally then forces a clean exit
-        return None
+        # Hard-terminate immediately. Graceful teardown (Qt quit + Tobii unsubscribe) can
+        # block on native threads and hang the exit; os._exit kills the whole process now.
+        os._exit(0)
     if key == ord(" "):
         return not paused
     if key == ord("m"):
