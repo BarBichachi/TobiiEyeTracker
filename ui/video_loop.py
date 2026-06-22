@@ -29,8 +29,13 @@ def show_video(cap, wait_time_ms, app):
             if not paused:
                 frame = _read_frame_or_none(cap)
                 if frame is None:
-                    print("[Video] Frame read failed")
-                    continue
+                    # End of clip (or transient miss): rewind and loop the video instead of
+                    # busy-spinning on a dead capture. Break only if rewind yields nothing.
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame = _read_frame_or_none(cap)
+                    if frame is None:
+                        print("[Video] Capture ended")
+                        break
 
             now = time.time()
             targets, mask_raw = _detect_targets(frame)
@@ -56,6 +61,8 @@ def show_video(cap, wait_time_ms, app):
                 _update_tracking_mode(now)
 
             target_overlay.draw_focus_and_latch(canvas, targets, focus_state["focused_idx"], focus_from_sticky, latch_state["latched_anchor"], latch_state["latched_idx"])
+
+            render.draw_toast(canvas, now)
 
             cv2.imshow(_WINDOW_NAME, canvas)
 
@@ -236,7 +243,7 @@ def _handle_gaze_button_interaction(now):
     state.current_button_progress = 0.0
 
 
-# Handles pause/quit key inputs and returns new paused state or None to exit
+# Handles pause/quit/mute key inputs and returns new paused state or None to exit
 def _handle_pause_quit(wait_time_ms, app, paused):
     key = cv2.waitKey(wait_time_ms) & 0xFF
 
@@ -245,8 +252,20 @@ def _handle_pause_quit(wait_time_ms, app, paused):
         return None
     if key == ord(" "):
         return not paused
+    if key == ord("m"):
+        _toggle_mute()
 
     return paused
+
+
+# Toggles global sound and shows a transient on-screen toast as feedback
+def _toggle_mute():
+    enabled = sound.toggle_sound_enabled()
+    if enabled:
+        render.set_toast("Sound On", (0, 220, 0), 3.0, icon="sound_on")
+        sound.play_button_pressed_sound()
+    else:
+        render.set_toast("Sound Off", (60, 60, 255), 3.0, icon="sound_off")
 
 
 # Draws attention prompt and beeps when gaze timeout is exceeded (rate-limited)

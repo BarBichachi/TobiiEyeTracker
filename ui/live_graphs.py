@@ -3,22 +3,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time as dt_time
+import math
+from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import pyqtgraph as pg
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from core import config
+from core import config, state
+from core.math_utils import delta, distance
 
 
 _NUM_ROWS = 2
 _NUM_COLS = 3
 _MAX_HISTORY = 1000
 _VISIBLE_X_RANGE_SEC = 10.0
-_GRAPH_SAMPLE_HZ = 100
-_GRAPH_SAMPLE_INTERVAL_SEC = 1.0 / _GRAPH_SAMPLE_HZ
+_GRAPH_SAMPLE_HZ = 30
+_GRAPH_UPDATE_INTERVAL_MS = int(1000 / _GRAPH_SAMPLE_HZ)
 
 
 class LiveGraphs(QWidget):
@@ -28,7 +32,6 @@ class LiveGraphs(QWidget):
 
         self._start_time = None
         self._running = False
-        self._last_sample_t = None
 
         self._plots = []
         self._curves = []
@@ -41,6 +44,14 @@ class LiveGraphs(QWidget):
 
         self._configure_window()
         self._build_layout()
+
+        # Sampling is driven by a QTimer on the Qt main thread so all widget access stays
+        # on the GUI thread. The previous design pushed updates from a background daemon
+        # thread, which is unsafe with Qt and caused UI freezes on interaction events.
+        self._timer = QTimer(self)
+        self._timer.setInterval(_GRAPH_UPDATE_INTERVAL_MS)
+        self._timer.timeout.connect(self._on_tick)
+        self._timer.start()
 
     # Configures top-level window style/title
     def _configure_window(self):
@@ -106,17 +117,44 @@ class LiveGraphs(QWidget):
 
         layout.addLayout(hbox, _NUM_ROWS, 0, 1, _NUM_COLS)
 
-    # Toggles start/stop and captures the start timestamp (seconds within day)
+    # Toggles start/stop and captures the start timestamp (monotonic clock)
     def toggle_timer(self):
-        now = datetime.now()
-        midnight = datetime.combine(now.date(), dt_time(0, 0, 0))
-        timestamp = (now - midnight).total_seconds()
-
         self._running = not self._running
-        self._start_time = timestamp if self._running else None
+        self._start_time = perf_counter() if self._running else None
         self._start_stop_button.setText("Stop" if self._running else "Start")
 
-    # Updates graphs at a fixed sampling cadence (e.g., 100 Hz)
+    # Main-thread sampling tick: compute gaze/target metrics and feed the graphs
+    def _on_tick(self):
+        if not self._running or self._start_time is None:
+            return
+
+        values = self._compute_metrics()
+        if values is None:
+            return
+
+        self.update_graphs(values, perf_counter())
+
+    # Builds [dx, dy, dr, ex, ey, er] from gaze vs target (log-scaled past threshold)
+    @staticmethod
+    def _compute_metrics():
+        # Snapshot shared state into locals to avoid torn reads across threads.
+        gx, gy = state.gaze_x, state.gaze_y
+        tx, ty = state.target_x, state.target_y
+
+        dx = delta(gx, tx)
+        dy = delta(gy, ty)
+        dr = distance(gx, gy, tx, ty)
+
+        if dx is None or dy is None or dr is None:
+            return None
+
+        ex = math.log(abs(dx / config.X_THRESH)) * np.sign(dx) if abs(dx) > config.X_THRESH else 0
+        ey = math.log(abs(dy / config.Y_THRESH)) * np.sign(dy) if abs(dy) > config.Y_THRESH else 0
+        er = math.log(dr / config.R_THRESH) if dr > config.R_THRESH else 0
+
+        return [dx, dy, dr, ex, ey, er]
+
+    # Updates graphs at a fixed sampling cadence
     def update_graphs(self, data, timestamp):
         if not self._running or self._start_time is None:
             return
@@ -126,14 +164,6 @@ class LiveGraphs(QWidget):
             return
 
         t = float(timestamp) - float(self._start_time)
-
-        if self._last_sample_t is None:
-            self._last_sample_t = t
-
-        if (t - self._last_sample_t) < _GRAPH_SAMPLE_INTERVAL_SEC:
-            return
-
-        self._last_sample_t = t
 
         for i in range(_NUM_ROWS * _NUM_COLS):
             self._append_data(i, t, values[i])

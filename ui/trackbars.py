@@ -48,14 +48,17 @@ def _on_grayscale_toggle(value):
 def create_trackbars():
     cv2.namedWindow(_TRACKBAR_WINDOW, cv2.WINDOW_NORMAL)
 
-    # NOTE: initial values are intentional and tuned
-    cv2.createTrackbar("Hue Min", _TRACKBAR_WINDOW, 0,   179, _on_hue_min)
-    cv2.createTrackbar("Hue Max", _TRACKBAR_WINDOW, 15,  179, _on_hue_max)
+    # Initial positions are seeded from config (the single source of truth for the tuned
+    # mask); slider ranges are the full OpenCV HSV ranges.
+    hue_max = config.HSV_HUE_RANGE_MAX
+    sv_max = config.HSV_SV_RANGE_MAX
+    cv2.createTrackbar("Hue Min", _TRACKBAR_WINDOW, config.HUE_MIN, hue_max, _on_hue_min)
+    cv2.createTrackbar("Hue Max", _TRACKBAR_WINDOW, config.HUE_MAX, hue_max, _on_hue_max)
 
-    cv2.createTrackbar("Sat Min", _TRACKBAR_WINDOW, 0,   255, _on_sat_min)
-    cv2.createTrackbar("Sat Max", _TRACKBAR_WINDOW, 255, 255, _on_sat_max)
+    cv2.createTrackbar("Sat Min", _TRACKBAR_WINDOW, config.SAT_MIN, sv_max, _on_sat_min)
+    cv2.createTrackbar("Sat Max", _TRACKBAR_WINDOW, config.SAT_MAX, sv_max, _on_sat_max)
 
-    cv2.createTrackbar("Val Min", _TRACKBAR_WINDOW, 0,   255, _on_val_min)
-    cv2.createTrackbar("Val Max", _TRACKBAR_WINDOW, 40,  255, _on_val_max)
+    cv2.createTrackbar("Val Min", _TRACKBAR_WINDOW, config.VAL_MIN, sv_max, _on_val_min)
+    cv2.createTrackbar("Val Max", _TRACKBAR_WINDOW, config.VAL_MAX, sv_max, _on_val_max)
 
-    cv2.createTrackbar("Grayscale", _TRACKBAR_WINDOW, 0, 1, _on_grayscale_toggle)
+    cv2.createTrackbar("Grayscale", _TRACKBAR_WINDOW, int(config.IS_GRAYSCALE), 1, _on_grayscale_toggle)

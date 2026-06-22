@@ -16,10 +16,13 @@ VIDEOS_DIR = ASSETS_DIR / "videos"
 
 
 # region HSV Threshold Defaults
-# OpenCV HSV hue range is [0..179] for 8-bit images
-HUE_MIN, HUE_MAX = 0, 179
+# OpenCV HSV ranges: hue [0..179], sat/val [0..255] for 8-bit images.
+# These tuned defaults are the single source of truth; trackbars are seeded from them.
+HSV_HUE_RANGE_MAX = 179
+HSV_SV_RANGE_MAX = 255
+HUE_MIN, HUE_MAX = 0, 15
 SAT_MIN, SAT_MAX = 0, 255
-VAL_MIN, VAL_MAX = 0, 255
+VAL_MIN, VAL_MAX = 0, 40
 IS_GRAYSCALE = False
 # endregion
 
@@ -54,6 +57,12 @@ LATCH_STICKY_SECONDS = 0.2
 # region Kalman Filter Tuning
 GAZE_PROCESS_NOISE_COV = 0.1
 GAZE_MEASUREMENT_NOISE_COV = 50.0
+# endregion
+
+
+# region Audio
+# Master switch for sound feedback. Set False to mute (e.g. during testing).
+SOUND_ENABLED = True
 # endregion
 
 

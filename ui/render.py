@@ -2,6 +2,7 @@
 # Drawing utilities for gaze overlays, tracking indicators, attention prompts, and on-screen UI widgets.
 import time
 import cv2
+import numpy as np
 
 from core import config, entropy, math_utils, state
 from ui.gaze_trail import GazeTrail
@@ -88,3 +89,68 @@ def draw_gaze_trail_and_entropy(frame):
     text = f"Consistency: {1.0 - c:.2f}" if c is not None else "Consistency: --"
 
     cv2.putText(frame, text, (14, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+
+
+# Sets a transient on-screen toast shown for `duration_s` seconds
+def set_toast(text, color=(255, 255, 255), duration_s=3.0, icon=None):
+    state.toast_text = str(text)
+    state.toast_color = tuple(color)
+    state.toast_icon = icon
+    state.toast_expiry = time.time() + float(duration_s)
+
+
+# Draws the active toast (centered semi-transparent panel) until it expires
+def draw_toast(frame, now=None):
+    if not state.toast_text:
+        return
+
+    now = time.time() if now is None else now
+    if now >= state.toast_expiry:
+        return
+
+    h, w = frame.shape[:2]
+    text = state.toast_text
+    color = state.toast_color
+    icon = state.toast_icon
+
+    font = cv2.FONT_HERSHEY_DUPLEX
+    scale = 1.0
+    thickness = 2
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+
+    pad = 22
+    icon_w = 48 if icon else 0
+    gap = 16 if icon else 0
+    panel_w = pad + icon_w + gap + tw + pad
+    panel_h = pad + max(th, 34) + pad
+
+    x1 = (w - panel_w) // 2
+    y1 = int(h * 0.12)
+    x2, y2 = x1 + panel_w, y1 + panel_h
+    cy = y1 + panel_h // 2
+
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (35, 35, 35), -1)
+    cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+    text_x = x1 + pad
+    if icon:
+        _draw_speaker_icon(frame, x1 + pad, cy, icon, color)
+        text_x = x1 + pad + icon_w + gap
+
+    cv2.putText(frame, text, (text_x, cy + th // 2), font, scale, color, thickness, cv2.LINE_AA)
+
+
+# Draws a small speaker glyph with sound waves ("sound_on") or a red cross ("sound_off")
+def _draw_speaker_icon(frame, x, cy, icon, color):
+    cv2.rectangle(frame, (x, cy - 7), (x + 7, cy + 7), color, -1)
+    cone = np.array([[x + 7, cy - 7], [x + 7, cy + 7], [x + 20, cy + 15], [x + 20, cy - 15]], np.int32)
+    cv2.fillPoly(frame, [cone], color)
+
+    if icon == "sound_off":
+        cv2.line(frame, (x + 26, cy - 12), (x + 42, cy + 12), (0, 0, 255), 3, cv2.LINE_AA)
+        cv2.line(frame, (x + 26, cy + 12), (x + 42, cy - 12), (0, 0, 255), 3, cv2.LINE_AA)
+    else:
+        cv2.ellipse(frame, (x + 22, cy), (8, 12), 0, -55, 55, color, 2, cv2.LINE_AA)
+        cv2.ellipse(frame, (x + 22, cy), (16, 20), 0, -55, 55, color, 2, cv2.LINE_AA)

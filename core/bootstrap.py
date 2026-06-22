@@ -2,62 +2,19 @@
 # Boots the runtime: eye tracker connection, gaze subscription, video source init, UI startup, and periodic update loops.
 
 import atexit
-import math
 import threading
-import time
 
 import cv2
-import numpy as np
 import tobii_research as tr
 from PySide6.QtWidgets import QApplication
 
-from core import config, gaze, state
+from core import config, gaze, sound, state
 from core.mock_eye_tracker import MockEyeTracker
-from core.math_utils import delta, distance
 from ui import live_graphs, trackbars, video_loop
 
 
-GRAPH_UPDATE_INTERVAL_SEC = 0.01
 DEFAULT_FRAME_WAIT_MS = 33
 MOCK_TRACKER_HZ = 120
-
-
-# Runs a function periodically in a daemon thread
-def _run_periodically(interval_sec, func):
-    def runner():
-        while True:
-            try:
-                func()
-            except Exception as e:
-                print(f"[Periodic Task Error] {e}")
-            time.sleep(interval_sec)
-
-    threading.Thread(target=runner, daemon=True).start()
-
-
-# Calculates entropy-style values and pushes them to the live graphs
-def _update_graph_data():
-    if state.graph_window is None:
-        return
-
-    if state.gaze_x is None or state.gaze_y is None or state.target_x is None or state.target_y is None:
-        return
-
-    dx = delta(state.gaze_x, state.target_x)
-    dy = delta(state.gaze_y, state.target_y)
-    dr = distance(state.gaze_x, state.gaze_y, state.target_x, state.target_y)
-
-    if dx is None or dy is None or dr is None:
-        return
-
-    ex = math.log(abs(dx / config.X_THRESH)) * np.sign(dx) if abs(dx) > config.X_THRESH else 0
-    ey = math.log(abs(dy / config.Y_THRESH)) * np.sign(dy) if abs(dy) > config.Y_THRESH else 0
-    er = math.log(dr / config.R_THRESH) if dr > config.R_THRESH else 0
-
-    try:
-        state.graph_window.update_graphs([dx, dy, dr, ex, ey, er], state.timestamp)
-    except Exception as e:
-        print(f"[Graph Update Error] {e}")
 
 
 # Opens the configured video source and returns (cap, wait_time_ms)
@@ -128,6 +85,10 @@ def _make_tobii_shutdown(tracker):
 # Starts the runtime: tracker, video, UI, background loops
 def start():
     try:
+        sound.set_sound_enabled(config.SOUND_ENABLED)
+        if config.SOUND_ENABLED:
+            sound.preload_sounds()
+
         tracker = _create_tracker()
         _subscribe_gaze(tracker)
         _print_tracker_info(tracker)
@@ -142,7 +103,6 @@ def start():
         state.graph_window.show()
 
         threading.Thread(target=video_loop.show_video, args=(cap, wait_time, app), daemon=True).start()
-        _run_periodically(GRAPH_UPDATE_INTERVAL_SEC, _update_graph_data)
 
         app.exec()
 

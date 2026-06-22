@@ -2,8 +2,12 @@
 # Bounding-box helpers used by the tracking pipeline.
 # Provides center/offset computations for (x, y, w, h) boxes relative to the image center.
 
-import torch
 import numpy as np
+
+try:
+    import torch
+except ImportError:
+    torch = None
 
 
 # Converts (x, y, w, h) box to (dx, dy, w, h) relative to image center (right=+, up=+)

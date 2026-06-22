@@ -85,3 +85,12 @@ target_present = False
 # Live graph window instance (Qt widget)
 graph_window = None
 # endregion
+
+
+# region On-screen Toast (transient feedback)
+# Active toast message, color, icon key, and absolute expiry time (epoch seconds)
+toast_text = ""
+toast_color = (255, 255, 255)
+toast_icon = None
+toast_expiry = 0.0
+# endregion

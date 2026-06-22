@@ -50,6 +50,18 @@ def set_sound_enabled(enabled: bool):
     _SOUND_ENABLED = bool(enabled)
 
 
+# Returns whether sound playback is currently enabled
+def is_sound_enabled():
+    return _SOUND_ENABLED
+
+
+# Toggles sound on/off and returns the new state
+def toggle_sound_enabled():
+    global _SOUND_ENABLED
+    _SOUND_ENABLED = not _SOUND_ENABLED
+    return _SOUND_ENABLED
+
+
 # Preloads all known sound assets (optional; keeps runtime playback consistent)
 def preload_sounds():
     _get_sound(config.USER_MODE_SOUND)
