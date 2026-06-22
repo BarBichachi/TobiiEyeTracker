@@ -27,7 +27,7 @@ _PANEL_BG = (28, 28, 28)
 
 
 # Draws a semi-transparent panel with a thin colored border
-def _draw_panel(frame, x1, y1, x2, y2, border_color, alpha=0.55):
+def _draw_panel(frame, x1, y1, x2, y2, border_color, alpha=0.35):
     h, w = frame.shape[:2]
     x1, y1 = max(0, x1), max(0, y1)
     x2, y2 = min(w, x2), min(h, y2)
@@ -91,7 +91,7 @@ def draw_button_overlay(frame):
     btn = config.BUTTON_RECT
     x, y, w, h = int(btn["x"]), int(btn["y"]), int(btn["w"]), int(btn["h"])
 
-    _draw_panel(frame, x, y, x + w, y + h, (255, 0, 0), alpha=0.5)
+    _draw_panel(frame, x, y, x + w, y + h, (255, 0, 0), alpha=0.35)
 
     p = float(state.current_button_progress or 0.0)
     if p > 0.0:
@@ -133,7 +133,7 @@ def draw_gaze_trail_and_entropy(frame):
     font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2
     (tw, th), base = cv2.getTextSize(text, font, scale, thickness)
     org = (14, 34)
-    _draw_panel(frame, org[0] - 10, org[1] - th - 10, org[0] + tw + 10, org[1] + base + 4, (180, 180, 180), alpha=0.5)
+    _draw_panel(frame, org[0] - 10, org[1] - th - 10, org[0] + tw + 10, org[1] + base + 4, (180, 180, 180), alpha=0.35)
     cv2.putText(frame, text, org, font, scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
 
@@ -171,13 +171,13 @@ def draw_toast(frame, now=None):
     panel_h = pad + max(th, 34) + pad
 
     x1 = (w - panel_w) // 2
-    y1 = int(h * 0.12)
+    y1 = h - panel_h - 50  # anchored near the bottom so it never overlaps the top HUD
     x2, y2 = x1 + panel_w, y1 + panel_h
     cy = y1 + panel_h // 2
 
     overlay = frame.copy()
     cv2.rectangle(overlay, (x1, y1), (x2, y2), (35, 35, 35), -1)
-    cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+    cv2.addWeighted(overlay, 0.45, frame, 0.55, 0, frame)
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
     text_x = x1 + pad
@@ -200,3 +200,61 @@ def _draw_speaker_icon(frame, x, cy, icon, color):
     else:
         cv2.ellipse(frame, (x + 22, cy), (8, 12), 0, -55, 55, color, 2, cv2.LINE_AA)
         cv2.ellipse(frame, (x + 22, cy), (16, 20), 0, -55, 55, color, 2, cv2.LINE_AA)
+
+
+# Keyboard controls shown in the legend
+_LEGEND_LINES = [
+    ("q", "Quit"),
+    ("space", "Pause"),
+    ("M", "Mute / unmute"),
+    ("F", "Fullscreen"),
+    ("H", "Hide help"),
+]
+_LEGEND_FONT = cv2.FONT_HERSHEY_SIMPLEX
+_KEY_COLOR = (0, 220, 255)
+_DESC_COLOR = (230, 230, 230)
+
+
+# Draws the hotkey legend (top-right): a permanent "H Help" hint, expanded on toggle
+def draw_hotkey_legend(frame):
+    if state.show_legend:
+        _draw_legend_panel(frame)
+    else:
+        _draw_legend_hint(frame)
+
+
+# Compact always-on hint so the user always knows how to open the legend
+def _draw_legend_hint(frame):
+    h, w = frame.shape[:2]
+    text = "H  Help"
+    scale, thick, pad = 0.5, 1, 8
+    (tw, th), base = cv2.getTextSize(text, _LEGEND_FONT, scale, thick)
+    x2, y1 = w - 14, 14
+    x1, y2 = x2 - tw - 2 * pad, y1 + th + 2 * pad
+    _draw_panel(frame, x1, y1, x2, y2, (150, 150, 150), alpha=0.25)
+    cv2.putText(frame, text, (x1 + pad, y2 - pad), _LEGEND_FONT, scale, (215, 215, 215), thick, cv2.LINE_AA)
+
+
+# Full hotkey list panel
+def _draw_legend_panel(frame):
+    h, w = frame.shape[:2]
+    scale, thick, pad, line_h, key_w = 0.55, 1, 14, 26, 70
+    title = "Hotkeys"
+
+    desc_w = max(cv2.getTextSize(d, _LEGEND_FONT, scale, thick)[0][0] for _, d in _LEGEND_LINES)
+    title_w = cv2.getTextSize(title, _LEGEND_FONT, 0.6, 1)[0][0]
+    content_w = max(key_w + desc_w, title_w)
+
+    panel_w = content_w + 2 * pad
+    panel_h = pad + line_h * (len(_LEGEND_LINES) + 1) + pad
+    x2, y1 = w - 14, 14
+    x1, y2 = x2 - panel_w, y1 + panel_h
+    _draw_panel(frame, x1, y1, x2, y2, (200, 200, 200), alpha=0.3)
+
+    yy = y1 + pad + 16
+    cv2.putText(frame, title, (x1 + pad, yy), _LEGEND_FONT, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+    yy += line_h
+    for key, desc in _LEGEND_LINES:
+        cv2.putText(frame, key, (x1 + pad, yy), _LEGEND_FONT, scale, _KEY_COLOR, thick, cv2.LINE_AA)
+        cv2.putText(frame, desc, (x1 + pad + key_w, yy), _LEGEND_FONT, scale, _DESC_COLOR, thick, cv2.LINE_AA)
+        yy += line_h

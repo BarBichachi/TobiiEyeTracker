@@ -5,7 +5,11 @@ import math
 import random
 import threading
 import time
+import logging
 from typing import Callable, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 class MockEyeTracker:
@@ -50,7 +54,7 @@ class MockEyeTracker:
                 try:
                     cb(gaze_data)
                 except Exception as e:
-                    print(f"[MockEyeTracker] Callback error: {e}")
+                    logger.error("Callback error: %s", e)
 
             self._stop_event.wait(dt)
 

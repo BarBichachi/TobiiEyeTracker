@@ -77,25 +77,10 @@ ATTENTION_LABEL = {
     "lineType": cv2.LINE_AA,
 }
 
-TRACKING_MODE_LABEL = {
-    "text": "Tracking mode: Computer",
-    "org": (0, 0),
-    "fontFace": cv2.FONT_HERSHEY_DUPLEX,
-    "fontScale": 1,
-    "color": (0, 0, 255),
-    "thickness": 2,
-    "lineType": cv2.LINE_AA,
-}
+# Mode/lock labels are drawn centered via render.draw_hud_label, which only needs text+color.
+TRACKING_MODE_LABEL = {"text": "Tracking mode: Computer", "color": (0, 0, 255)}
 
-TRACKING_LOCK_LABEL = {
-    "text": "Tracking Lock: OFF",
-    "org": (0, 0),
-    "fontFace": cv2.FONT_HERSHEY_SIMPLEX,
-    "fontScale": 1,
-    "color": (255, 255, 0),
-    "thickness": 2,
-    "lineType": cv2.LINE_AA,
-}
+TRACKING_LOCK_LABEL = {"text": "Tracking Lock: OFF", "color": (255, 255, 0)}
 
 BUTTON_RECT = {"x": 270, "y": 20, "w": 250, "h": 50}
 

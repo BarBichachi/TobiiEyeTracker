@@ -5,11 +5,15 @@
 
 from core import config
 
+import logging
+
 try:
     import winsound
 except ImportError:  # non-Windows: degrade to silent rather than crashing on import
     winsound = None
 
+
+logger = logging.getLogger(__name__)
 
 _SOUND_ENABLED = False
 _FAILED_SOUNDS = set()
@@ -28,14 +32,14 @@ def _play(sound_path):
 
     if not sound_path.exists():
         _FAILED_SOUNDS.add(key)
-        print(f"[Sound] Missing file: {key}")
+        logger.warning("Missing file: %s", key)
         return
 
     try:
         winsound.PlaySound(key, _PLAY_FLAGS)
     except Exception as e:
         _FAILED_SOUNDS.add(key)
-        print(f"[Sound] Playback failed: {key} ({e})")
+        logger.error("Playback failed: %s (%s)", key, e)
 
 
 # Enables or disables all sound playback globally
@@ -67,7 +71,7 @@ def preload_sounds():
     for p in paths:
         if not p.exists():
             _FAILED_SOUNDS.add(str(p))
-            print(f"[Sound] Missing file: {p}")
+            logger.warning("Missing file: %s", p)
 
 
 # Plays sound when user mode is activated

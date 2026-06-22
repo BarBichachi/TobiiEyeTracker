@@ -1,6 +1,7 @@
 # video_loop.py
 # Runs the real-time video loop: frame acquisition, target extraction, gaze interaction, state updates, and overlay rendering.
 
+import logging
 import time
 import traceback
 
@@ -11,7 +12,21 @@ from core import config, gaze, math_utils, sound, state, targeting
 from ui import eye_overlay, render, target_overlay
 
 
+logger = logging.getLogger(__name__)
+
 _WINDOW_NAME = "Main Window"
+
+
+# Applies the current fullscreen state to the main window
+def _apply_fullscreen(enabled):
+    prop = cv2.WINDOW_FULLSCREEN if enabled else cv2.WINDOW_NORMAL
+    cv2.setWindowProperty(_WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, prop)
+
+
+# Toggles fullscreen (gaze->pixel mapping is only correct when fullscreen)
+def _toggle_fullscreen():
+    state.fullscreen = not state.fullscreen
+    _apply_fullscreen(state.fullscreen)
 
 
 # Runs the main video loop until quit is requested or capture ends
@@ -20,6 +35,7 @@ def show_video(cap, wait_time_ms, app):
     frame = None
 
     cv2.namedWindow(_WINDOW_NAME, cv2.WINDOW_NORMAL)
+    _apply_fullscreen(state.fullscreen)
 
     focus_state = _create_focus_state()
     latch_state = _create_latch_state()
@@ -34,7 +50,7 @@ def show_video(cap, wait_time_ms, app):
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     frame = _read_frame_or_none(cap)
                     if frame is None:
-                        print("[Video] Capture ended")
+                        logger.info("Capture ended")
                         break
 
             now = time.time()
@@ -62,6 +78,7 @@ def show_video(cap, wait_time_ms, app):
 
             target_overlay.draw_focus_and_latch(canvas, targets, focus_state["focused_idx"], focus_from_sticky, latch_state["latched_anchor"], latch_state["latched_idx"])
 
+            render.draw_hotkey_legend(canvas)
             render.draw_toast(canvas, now)
 
             cv2.imshow(_WINDOW_NAME, canvas)
@@ -72,7 +89,7 @@ def show_video(cap, wait_time_ms, app):
             paused = paused_next
 
     except Exception:
-        print("[Video] Frame error\n", traceback.format_exc())
+        logger.error("Frame error\n%s", traceback.format_exc())
 
     finally:
         cap.release()
@@ -235,9 +252,11 @@ def _handle_gaze_button_interaction(now):
     if config.IS_GRAYSCALE:
         sound.play_cognitive_aid_disabled_sound()
         config.IS_GRAYSCALE = False
+        render.set_toast("Cognitive Aid Off", (60, 60, 255), 3.0)
     else:
         sound.play_cognitive_aid_enabled_sound()
         config.IS_GRAYSCALE = True
+        render.set_toast("Cognitive Aid On", (0, 220, 0), 3.0)
 
     state.button_dwell_start_time = None
     state.current_button_progress = 0.0
@@ -254,6 +273,10 @@ def _handle_pause_quit(wait_time_ms, app, paused):
         return not paused
     if key == ord("m"):
         _toggle_mute()
+    if key == ord("f"):
+        _toggle_fullscreen()
+    if key == ord("h"):
+        state.show_legend = not state.show_legend
 
     return paused
 
@@ -325,6 +348,7 @@ def _handle_tracking_lock_toggle(canvas, now):
         config.TRACKING_LOCK_LABEL["text"] = "Tracking Lock: 'ON'"
         config.TRACKING_LOCK_LABEL["color"] = (0, 255, 255)
         sound.play_tracking_lock_enabled_sound()
+        render.set_toast("Tracking Lock On", (0, 255, 255), 3.0)
         state.user_is_tracking = False
         state.current_gaze_mode = "computer"
         _set_tracking_label("Computer", (0, 0, 255))
@@ -332,6 +356,7 @@ def _handle_tracking_lock_toggle(canvas, now):
         config.TRACKING_LOCK_LABEL["text"] = "Tracking Lock: 'OFF'"
         config.TRACKING_LOCK_LABEL["color"] = (255, 255, 0)
         sound.play_tracking_lock_disabled_sound()
+        render.set_toast("Tracking Lock Off", (255, 255, 0), 3.0)
 
 
 # Extracts contour-based targets (bbox/center/area), sorted by area descending

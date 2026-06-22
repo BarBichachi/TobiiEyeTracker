@@ -51,6 +51,8 @@ Three windows open:
 | `q`     | Quit                                    |
 | `space` | Pause / resume the video                |
 | `M`     | Mute / unmute sound (3s on-screen toast)|
+| `F`     | Toggle fullscreen (on by default)       |
+| `H`     | Toggle the hotkey legend                |
 
 ### Eye gestures
 
@@ -114,8 +116,10 @@ python -m pytest
 
 ## Notes
 
-- Gaze is mapped to pixels as `normalized_gaze x video_frame_size`, which assumes the Main
-  Window is shown fullscreen at the video's native resolution. If you run it windowed and the
-  gaze marker looks offset, that mapping is the thing to revisit.
+- The Main Window starts **fullscreen** (toggle with `F`). Gaze is mapped to pixels as
+  `normalized_gaze x video_frame_size`, which is correct when the window fills the display;
+  if you switch to windowed and the gaze marker looks offset, that's why.
 - Live graphs are driven by a Qt main-thread `QTimer` (all widget access stays on the GUI
   thread); pushing updates from a background thread is unsafe with Qt.
+- Audio uses the Windows-native `winsound` (SND_ASYNC), which is non-blocking and does not
+  hold the GIL; this is why sound playback no longer freezes the UI.

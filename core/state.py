@@ -94,3 +94,11 @@ toast_color = (255, 255, 255)
 toast_icon = None
 toast_expiry = 0.0
 # endregion
+
+
+# region UI Toggles
+# Main window fullscreen (gaze->pixel mapping is only correct fullscreen)
+fullscreen = True
+# Whether the expanded hotkey legend is shown
+show_legend = False
+# endregion

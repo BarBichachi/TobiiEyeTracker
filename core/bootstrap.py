@@ -2,6 +2,7 @@
 # Boots the runtime: eye tracker connection, gaze subscription, video source init, UI startup, and periodic update loops.
 
 import atexit
+import logging
 import threading
 
 import cv2
@@ -12,6 +13,8 @@ from core import config, gaze, sound, state
 from core.mock_eye_tracker import MockEyeTracker
 from ui import live_graphs, trackbars, video_loop
 
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_FRAME_WAIT_MS = 33
 MOCK_TRACKER_HZ = 120
@@ -52,7 +55,7 @@ def _configure_layout_from_video(cap):
 def _create_tracker():
     eyetrackers = tr.find_all_eyetrackers()
     if not eyetrackers:
-        print("[Startup] No eye tracker found. Using MockEyeTracker")
+        logger.warning("No eye tracker found. Using MockEyeTracker")
         return MockEyeTracker(hz=MOCK_TRACKER_HZ)
     return eyetrackers[0]
 
@@ -63,13 +66,13 @@ def _subscribe_gaze(tracker):
     atexit.register(_make_tobii_shutdown(tracker))
 
 
-# Prints tracker details in a consistent format
+# Logs tracker details in a consistent format
 def _print_tracker_info(tracker):
-    print("[EyeTracker] Connected")
-    print(f"  Address: {getattr(tracker, 'address', '(N/A)')}")
-    print(f"  Model:   {getattr(tracker, 'model', '(N/A)')}")
-    print(f"  Name:    {getattr(tracker, 'device_name', None) or '(Unnamed)'}")
-    print(f"  Serial:  {getattr(tracker, 'serial_number', '(N/A)')}")
+    logger.info("EyeTracker connected")
+    logger.info("  Address: %s", getattr(tracker, "address", "(N/A)"))
+    logger.info("  Model:   %s", getattr(tracker, "model", "(N/A)"))
+    logger.info("  Name:    %s", getattr(tracker, "device_name", None) or "(Unnamed)")
+    logger.info("  Serial:  %s", getattr(tracker, "serial_number", "(N/A)"))
 
 
 # Unsubscribes from Tobii streams to avoid exit-time SDK errors
@@ -85,6 +88,7 @@ def _make_tobii_shutdown(tracker):
 
 # Starts the runtime: tracker, video, UI, background loops
 def start():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     try:
         sound.set_sound_enabled(config.SOUND_ENABLED)
         if config.SOUND_ENABLED:
@@ -108,4 +112,4 @@ def start():
         app.exec()
 
     except Exception as e:
-        print(f"[Startup Error] {e}")
+        logger.exception("Startup error: %s", e)
