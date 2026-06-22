@@ -36,15 +36,16 @@ def _configure_layout_from_video(cap):
     if state.screen_width <= 0 or state.screen_height <= 0:
         raise RuntimeError("Invalid video dimensions (width/height <= 0)")
 
-    config.TRACKING_MODE_LABEL["org"] = (state.screen_width // 2 - 200, 50)
-    config.TRACKING_LOCK_LABEL["org"] = (state.screen_width // 2 - 150, 110)
+    w, h = state.screen_width, state.screen_height
 
+    # Center the cognitive-aid button near the top; HUD labels are centered at draw time.
     button_width = config.BUTTON_RECT["w"]
-    button_height = config.BUTTON_RECT["h"]
-    config.BUTTON_RECT["x"] = state.screen_width // 2 - button_width // 2
-    config.BUTTON_RECT["y"] = config.TRACKING_MODE_LABEL["org"][1] + 100
+    config.BUTTON_RECT["x"] = w // 2 - button_width // 2
+    config.BUTTON_RECT["y"] = 150
 
-    config.BUTTON_LABEL["org"] = (config.BUTTON_RECT["x"] + 20, config.BUTTON_RECT["y"] + button_height // 2 + 10)
+    # Place pupil overlays relative to the bottom-right so they scale with resolution.
+    state.right_pupil_position = (w - 120, h - 130)
+    state.left_pupil_position = (w - 270, h - 130)
 
 
 # Finds a Tobii tracker or returns a mock tracker when none is available

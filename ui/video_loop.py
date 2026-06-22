@@ -114,14 +114,16 @@ def _render_common_overlays(canvas, now):
     _handle_tracking_lock_toggle(canvas, now)
 
     render.draw_gaze_point(canvas)
-    render.draw_label(canvas, config.TRACKING_MODE_LABEL)
+
+    cx = int(state.screen_width // 2)
+    render.draw_hud_label(canvas, config.TRACKING_MODE_LABEL["text"], config.TRACKING_MODE_LABEL["color"], cx, 56)
 
     _handle_attention_timeout(canvas, now)
 
     render.draw_button_overlay(canvas)
     _handle_gaze_button_interaction(now)
 
-    render.draw_label(canvas, config.TRACKING_LOCK_LABEL)
+    render.draw_hud_label(canvas, config.TRACKING_LOCK_LABEL["text"], config.TRACKING_LOCK_LABEL["color"], cx, 116)
 
 
 # Draws pupil overlays at fixed positions
@@ -198,11 +200,9 @@ def _update_tracking_mode(now):
 
         if desired_mode == "user":
             sound.play_user_mode_sound()
-            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 190, 50)
             _set_tracking_label("User", (0, 255, 0))
         else:
             sound.play_computer_mode_sound()
-            config.TRACKING_MODE_LABEL["org"] = (int(state.screen_width // 2) - 200, 50)
             _set_tracking_label("Computer", (0, 0, 255))
 
 
