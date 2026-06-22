@@ -1,47 +1,41 @@
 # sound.py
-# Handles audio feedback for tracking and interaction events.
-# Uses non-blocking playback with lazy loading and optional global mute.
-
-import simpleaudio as sa
+# Audio feedback via the Windows-native winsound (SND_ASYNC): OS-level playback that
+# returns immediately and does NOT hold the Python GIL. simpleaudio's play() blocked the
+# caller ~1s AND held the GIL, freezing the video loop on every sound-playing event.
 
 from core import config
 
+try:
+    import winsound
+except ImportError:  # non-Windows: degrade to silent rather than crashing on import
+    winsound = None
+
 
 _SOUND_ENABLED = False
-_SOUND_CACHE = {}
 _FAILED_SOUNDS = set()
 
+_PLAY_FLAGS = (winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT) if winsound else 0
 
-# Plays a configured sound if sound is enabled and the file is available
+
+# Plays a configured sound asynchronously (non-blocking) if enabled and available
 def _play(sound_path):
-    if not _SOUND_ENABLED:
+    if not _SOUND_ENABLED or winsound is None:
         return
 
-    sound = _get_sound(sound_path)
-    if sound is not None:
-        sound.play()
-
-
-# Lazily loads and caches a WaveObject, caching failures to avoid log spam
-def _get_sound(sound_path):
     key = str(sound_path)
-
     if key in _FAILED_SOUNDS:
-        return None
+        return
 
-    cached = _SOUND_CACHE.get(key)
-    if cached is not None:
-        return cached
+    if not sound_path.exists():
+        _FAILED_SOUNDS.add(key)
+        print(f"[Sound] Missing file: {key}")
+        return
 
     try:
-        wave = sa.WaveObject.from_wave_file(key)
+        winsound.PlaySound(key, _PLAY_FLAGS)
     except Exception as e:
         _FAILED_SOUNDS.add(key)
-        print(f"[Sound] Failed to load: {key} ({e})")
-        return None
-
-    _SOUND_CACHE[key] = wave
-    return wave
+        print(f"[Sound] Playback failed: {key} ({e})")
 
 
 # Enables or disables all sound playback globally
@@ -62,17 +56,18 @@ def toggle_sound_enabled():
     return _SOUND_ENABLED
 
 
-# Preloads all known sound assets (optional; keeps runtime playback consistent)
+# Validates that sound assets exist (winsound needs no preloading); logs any missing ones
 def preload_sounds():
-    _get_sound(config.USER_MODE_SOUND)
-    _get_sound(config.COMPUTER_MODE_SOUND)
-    _get_sound(config.USER_NOT_HERE_SOUND)
-    _get_sound(config.BUTTON_PRESSED_SOUND)
-    _get_sound(config.TRACKING_LOCK_ENABLED_SOUND)
-    _get_sound(config.TRACKING_LOCK_DISABLED_SOUND)
-    _get_sound(config.COGNITIVE_AID_ENABLED_SOUND)
-    _get_sound(config.COGNITIVE_AID_DISABLED_SOUND)
-    _get_sound(config.SWITCHED_TARGET_SOUND)
+    paths = [
+        config.USER_MODE_SOUND, config.COMPUTER_MODE_SOUND, config.USER_NOT_HERE_SOUND,
+        config.BUTTON_PRESSED_SOUND, config.TRACKING_LOCK_ENABLED_SOUND,
+        config.TRACKING_LOCK_DISABLED_SOUND, config.COGNITIVE_AID_ENABLED_SOUND,
+        config.COGNITIVE_AID_DISABLED_SOUND, config.SWITCHED_TARGET_SOUND,
+    ]
+    for p in paths:
+        if not p.exists():
+            _FAILED_SOUNDS.add(str(p))
+            print(f"[Sound] Missing file: {p}")
 
 
 # Plays sound when user mode is activated
