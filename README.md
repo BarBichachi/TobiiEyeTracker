@@ -91,8 +91,9 @@ Most behavior is tunable in `core/config.py`, including:
 ```
 core/        domain logic and shared runtime state
   bootstrap.py        startup: tracker, video, UI, threads
-  gaze.py             Tobii callback, Kalman smoothing, gaze helpers
-  kalman_filter.py    1D constant-velocity filter
+  gaze.py             Tobii callback, One Euro gaze smoothing, gaze helpers
+  one_euro_filter.py  adaptive low-pass smoother (active gaze filter)
+  kalman_filter.py    1D constant-velocity filter (legacy fallback)
   targeting.py        focus selection + latch tracking
   entropy.py          windowed gaze entropy metrics
   mock_eye_tracker.py hardware-free gaze source
@@ -127,3 +128,8 @@ python -m pytest
 - The position guide (`P`) uses the Tobii `EYETRACKER_USER_POSITION_GUIDE` stream: move so
   both eye dots sit inside the central green zone and the depth marker is in the green band.
   The view is mirrored; if left/right feels inverted on your rig, tell us and we'll flip it.
+- Gaze is smoothed with a **One Euro Filter** (adaptive low-pass): low jitter when still, low
+  lag when moving, and no velocity coasting/overshoot after a saccade. Tuned via
+  `GAZE_MIN_CUTOFF`/`GAZE_BETA` in `config.py`; the old Kalman remains as a fallback.
+- Gaze *accuracy* (offset at a fixed point) depends on the tracker's per-user **calibration**,
+  not the smoother; calibrate in Tobii Eye Tracker Manager.

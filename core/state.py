@@ -14,6 +14,9 @@ target_y = 0
 # Kalman filters for gaze smoothing (initialized on first gaze sample)
 kalman_x = None
 kalman_y = None
+# One Euro filters for gaze smoothing (initialized on first gaze sample)
+gaze_filter_x = None
+gaze_filter_y = None
 # endregion
 
 

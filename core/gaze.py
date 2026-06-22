@@ -6,10 +6,10 @@ import math
 import time
 from datetime import datetime
 
-from core import config, kalman_filter, math_utils, state
+from core import config, math_utils, one_euro_filter, state
 
 
-# Handles gaze callback: smooth gaze with Kalman, update state, and track pupil diameters
+# Handles gaze callback: smooth gaze with the One Euro filter, update state, track pupils
 def on_gaze_data(data):
     now = datetime.now()
     state.timestamp = (now.hour * 3600_000 + now.minute * 60_000 + now.second * 1_000 + now.microsecond // 1_000) / 1000.0
@@ -21,7 +21,7 @@ def on_gaze_data(data):
         return
 
     raw_x, raw_y = _to_pixel_coords(avg_x, avg_y)
-    _update_kalman_and_state(raw_x, raw_y)
+    _update_filter_and_state(raw_x, raw_y)
 
     state.last_gaze_time = time.time()
     state.gaze_lost = False
@@ -52,10 +52,10 @@ def is_user_tracking_object():
     return dist < config.GAZE_TARGET_TOLERANCE
 
 
-# Initializes the Kalman filters for gaze smoothing
-def setup_kalman_filters(initial_x, initial_y):
-    state.kalman_x = kalman_filter.KalmanFilter(initial_position=initial_x, process_noise=config.GAZE_PROCESS_NOISE_COV, measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV)
-    state.kalman_y = kalman_filter.KalmanFilter(initial_position=initial_y, process_noise=config.GAZE_PROCESS_NOISE_COV, measurement_noise=config.GAZE_MEASUREMENT_NOISE_COV)
+# Initializes the One Euro gaze smoothing filters
+def setup_gaze_filters():
+    state.gaze_filter_x = one_euro_filter.OneEuroFilter(min_cutoff=config.GAZE_MIN_CUTOFF, beta=config.GAZE_BETA, d_cutoff=config.GAZE_D_CUTOFF)
+    state.gaze_filter_y = one_euro_filter.OneEuroFilter(min_cutoff=config.GAZE_MIN_CUTOFF, beta=config.GAZE_BETA, d_cutoff=config.GAZE_D_CUTOFF)
 
 
 # Extracts averaged gaze in display-area coords (0..1) using validity when available
@@ -83,21 +83,14 @@ def _to_pixel_coords(x, y):
     return int(x * state.screen_width), int(y * state.screen_height)
 
 
-# Updates Kalman filters and writes smoothed gaze to state
-def _update_kalman_and_state(raw_x, raw_y):
-    if state.kalman_x is None or state.kalman_y is None:
-        setup_kalman_filters(raw_x, raw_y)
-        state.gaze_x = raw_x
-        state.gaze_y = raw_y
-        return
+# Smooths raw gaze with the One Euro filters and writes the result to state
+def _update_filter_and_state(raw_x, raw_y):
+    if state.gaze_filter_x is None or state.gaze_filter_y is None:
+        setup_gaze_filters()
 
-    state.kalman_x.predict()
-    state.kalman_y.predict()
-    state.kalman_x.update(raw_x)
-    state.kalman_y.update(raw_y)
-
-    state.gaze_x = int(state.kalman_x.get_smoothed_position())
-    state.gaze_y = int(state.kalman_y.get_smoothed_position())
+    t = time.perf_counter()
+    state.gaze_x = int(state.gaze_filter_x.filter(t, raw_x))
+    state.gaze_y = int(state.gaze_filter_y.filter(t, raw_y))
 
 
 # Updates pupil diameters in state based on validity flags

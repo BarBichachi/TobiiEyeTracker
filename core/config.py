@@ -54,7 +54,14 @@ LATCH_STICKY_SECONDS = 0.2
 # endregion
 
 
-# region Kalman Filter Tuning
+# region Gaze Smoothing
+# Active smoother: One Euro Filter (adaptive low-pass; no velocity coasting/overshoot).
+# min_cutoff (Hz): lower = smoother but laggier when still; beta: higher = less lag when fast.
+GAZE_MIN_CUTOFF = 1.0
+GAZE_BETA = 0.02
+GAZE_D_CUTOFF = 1.0
+
+# Legacy constant-velocity Kalman tuning (kept for the fallback KalmanFilter, not used by default)
 GAZE_PROCESS_NOISE_COV = 0.1
 GAZE_MEASUREMENT_NOISE_COV = 50.0
 # endregion
