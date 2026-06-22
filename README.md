@@ -52,6 +52,7 @@ Three windows open:
 | `space` | Pause / resume the video                |
 | `M`     | Mute / unmute sound (3s on-screen toast)|
 | `F`     | Toggle fullscreen (on by default)       |
+| `P`     | Toggle the head/eye position guide      |
 | `H`     | Toggle the hotkey legend                |
 
 ### Eye gestures
@@ -123,3 +124,6 @@ python -m pytest
   thread); pushing updates from a background thread is unsafe with Qt.
 - Audio uses the Windows-native `winsound` (SND_ASYNC), which is non-blocking and does not
   hold the GIL; this is why sound playback no longer freezes the UI.
+- The position guide (`P`) uses the Tobii `EYETRACKER_USER_POSITION_GUIDE` stream: move so
+  both eye dots sit inside the central green zone and the depth marker is in the green band.
+  The view is mirrored; if left/right feels inverted on your rig, tell us and we'll flip it.

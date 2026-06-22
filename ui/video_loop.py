@@ -78,6 +78,7 @@ def show_video(cap, wait_time_ms, app):
 
             target_overlay.draw_focus_and_latch(canvas, targets, focus_state["focused_idx"], focus_from_sticky, latch_state["latched_anchor"], latch_state["latched_idx"])
 
+            render.draw_position_guide(canvas)
             render.draw_hotkey_legend(canvas)
             render.draw_toast(canvas, now)
 
@@ -94,6 +95,8 @@ def show_video(cap, wait_time_ms, app):
     finally:
         cap.release()
         cv2.destroyAllWindows()
+        for _ in range(3):
+            cv2.waitKey(1)  # pump HighGUI so the (fullscreen) window tears down promptly
 
 
 # Creates an initial focus state dictionary
@@ -267,7 +270,7 @@ def _handle_pause_quit(wait_time_ms, app, paused):
     key = cv2.waitKey(wait_time_ms) & 0xFF
 
     if key == ord("q"):
-        app.quit()
+        app.quit()  # ends app.exec(); bootstrap's finally then forces a clean exit
         return None
     if key == ord(" "):
         return not paused
@@ -277,6 +280,8 @@ def _handle_pause_quit(wait_time_ms, app, paused):
         _toggle_fullscreen()
     if key == ord("h"):
         state.show_legend = not state.show_legend
+    if key == ord("p"):
+        state.show_position_guide = not state.show_position_guide
 
     return paused
 

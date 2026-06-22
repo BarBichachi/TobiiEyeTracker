@@ -4,7 +4,7 @@ import time
 import cv2
 import numpy as np
 
-from core import config, entropy, math_utils, state
+from core import config, entropy, math_utils, positioning, state
 from ui.gaze_trail import GazeTrail
 
 _entropy_tracker = entropy.EntropyTracker(window_s=1.5, min_samples=5)
@@ -26,18 +26,29 @@ def draw_gaze_point(frame, radius=25, color=(0, 255, 0), thickness=2):
 _PANEL_BG = (28, 28, 28)
 
 
-# Draws a semi-transparent panel with a thin colored border
-def _draw_panel(frame, x1, y1, x2, y2, border_color, alpha=0.35):
+# Blends a solid color into only the given rectangle (cheap; touches a small ROI, not the
+# whole frame). Returns the clamped rect, or None if it is fully off-screen.
+def _blend_rect(frame, x1, y1, x2, y2, bg, alpha):
     h, w = frame.shape[:2]
-    x1, y1 = max(0, x1), max(0, y1)
-    x2, y2 = min(w, x2), min(h, y2)
+    x1, y1 = max(0, int(x1)), max(0, int(y1))
+    x2, y2 = min(w, int(x2)), min(h, int(y2))
     if x2 <= x1 or y2 <= y1:
-        return
+        return None
 
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), _PANEL_BG, -1)
-    cv2.addWeighted(overlay, alpha, frame, 1.0 - alpha, 0, frame)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), border_color, 1, cv2.LINE_AA)
+    roi = frame[y1:y2, x1:x2]
+    solid = np.empty_like(roi)
+    solid[:] = bg
+    cv2.addWeighted(roi, 1.0 - alpha, solid, alpha, 0.0, dst=roi)
+    return x1, y1, x2, y2
+
+
+# Draws a semi-transparent panel with a thin colored border (ROI-only blend)
+def _draw_panel(frame, x1, y1, x2, y2, border_color, alpha=0.35):
+    clamped = _blend_rect(frame, x1, y1, x2, y2, _PANEL_BG, alpha)
+    if clamped is None:
+        return
+    cx1, cy1, cx2, cy2 = clamped
+    cv2.rectangle(frame, (cx1, cy1), (cx2, cy2), border_color, 1, cv2.LINE_AA)
 
 
 # Draws a horizontally-centered HUD label with a panel behind it
@@ -175,9 +186,7 @@ def draw_toast(frame, now=None):
     x2, y2 = x1 + panel_w, y1 + panel_h
     cy = y1 + panel_h // 2
 
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), (35, 35, 35), -1)
-    cv2.addWeighted(overlay, 0.45, frame, 0.55, 0, frame)
+    _blend_rect(frame, x1, y1, x2, y2, (35, 35, 35), 0.45)
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
     text_x = x1 + pad
@@ -208,6 +217,7 @@ _LEGEND_LINES = [
     ("space", "Pause"),
     ("M", "Mute / unmute"),
     ("F", "Fullscreen"),
+    ("P", "Position guide"),
     ("H", "Hide help"),
 ]
 _LEGEND_FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -258,3 +268,70 @@ def _draw_legend_panel(frame):
         cv2.putText(frame, key, (x1 + pad, yy), _LEGEND_FONT, scale, _KEY_COLOR, thick, cv2.LINE_AA)
         cv2.putText(frame, desc, (x1 + pad + key_w, yy), _LEGEND_FONT, scale, _DESC_COLOR, thick, cv2.LINE_AA)
         yy += line_h
+
+
+def _clamp01(v):
+    try:
+        return max(0.0, min(1.0, float(v)))
+    except (TypeError, ValueError):
+        return 0.5
+
+
+# Draws the head/eye position guide (track box) when toggled on. The view is mirrored so it
+# behaves like a mirror: move so BOTH eye dots sit inside the central zone and the depth
+# marker is in the green band.
+def draw_position_guide(frame):
+    if not state.show_position_guide:
+        return
+
+    h, w = frame.shape[:2]
+    box_w, box_h = 420, 300
+    cx, cy = w // 2, int(h * 0.46)
+    bx1, by1 = cx - box_w // 2, cy - box_h // 2
+    bx2, by2 = bx1 + box_w, by1 + box_h
+
+    _draw_panel(frame, bx1 - 24, by1 - 58, bx2 + 80, by2 + 92, (200, 200, 200), alpha=0.5)
+    cv2.putText(frame, "Position Guide", (bx1, by1 - 26), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
+
+    # Track box outline
+    cv2.rectangle(frame, (bx1, by1), (bx2, by2), (120, 120, 120), 1, cv2.LINE_AA)
+
+    avg = positioning.average_position()
+    text, color, centered = positioning.position_feedback(avg)
+
+    # Central "good zone" big enough to hold both eyes when you're centered
+    zone_w, zone_h = int(box_w * 0.5), int(box_h * 0.42)
+    zx1, zy1 = cx - zone_w // 2, cy - zone_h // 2
+    zx2, zy2 = cx + zone_w // 2, cy + zone_h // 2
+    zone_color = (0, 220, 0) if centered else (110, 170, 90)
+    cv2.rectangle(frame, (zx1, zy1), (zx2, zy2), zone_color, 2, cv2.LINE_AA)
+
+    # Eye dots (mirrored horizontally; radius grows as you get closer)
+    dot_color = (0, 220, 0) if centered else (0, 200, 255)
+    for pos, valid in ((state.user_left_pos, state.user_left_valid), (state.user_right_pos, state.user_right_valid)):
+        if not valid or pos is None:
+            continue
+        nx, ny, nz = pos
+        px = int(bx1 + (1.0 - _clamp01(nx)) * box_w)
+        py = int(by1 + _clamp01(ny) * box_h)
+        r = int(max(8, min(26, 14 + (0.5 - _clamp01(nz)) * 28)))
+        cv2.circle(frame, (px, py), r, dot_color, 2, cv2.LINE_AA)
+        cv2.circle(frame, (px, py), 3, dot_color, -1, cv2.LINE_AA)
+
+    # Depth bar (right of the box) with an "ideal" band in the middle
+    dbx1, dbx2 = bx2 + 24, bx2 + 50
+    cv2.rectangle(frame, (dbx1, by1), (dbx2, by2), (130, 130, 130), 1, cv2.LINE_AA)
+    band = int(box_h * positioning.CENTER_TOLERANCE)
+    bandc = by1 + box_h // 2
+    cv2.rectangle(frame, (dbx1, bandc - band), (dbx2, bandc + band), (90, 200, 90), 1, cv2.LINE_AA)
+    if avg is not None:
+        zy = int(by1 + _clamp01(avg[2]) * box_h)
+        cv2.line(frame, (dbx1 - 5, zy), (dbx2 + 5, zy), dot_color, 2, cv2.LINE_AA)
+    cv2.putText(frame, "depth", (dbx1 - 4, by2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
+
+    # Status + instruction
+    (tw, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 0.7, 2)
+    cv2.putText(frame, text, (cx - tw // 2, by2 + 44), cv2.FONT_HERSHEY_DUPLEX, 0.7, color, 2, cv2.LINE_AA)
+    hint = "Move so both eyes sit inside the green zone"
+    (hw, _), _ = cv2.getTextSize(hint, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+    cv2.putText(frame, hint, (cx - hw // 2, by2 + 72), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (210, 210, 210), 1, cv2.LINE_AA)

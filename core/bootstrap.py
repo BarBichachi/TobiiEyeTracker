@@ -1,15 +1,15 @@
 # bootstrap.py
 # Boots the runtime: eye tracker connection, gaze subscription, video source init, UI startup, and periodic update loops.
 
-import atexit
 import logging
+import os
 import threading
 
 import cv2
 import tobii_research as tr
 from PySide6.QtWidgets import QApplication
 
-from core import config, gaze, sound, state
+from core import config, gaze, positioning, sound, state
 from core.mock_eye_tracker import MockEyeTracker
 from ui import live_graphs, trackbars, video_loop
 
@@ -60,10 +60,13 @@ def _create_tracker():
     return eyetrackers[0]
 
 
-# Subscribes to gaze stream and registers shutdown cleanup
-def _subscribe_gaze(tracker):
+# Subscribes to gaze + user-position-guide streams
+def _subscribe_streams(tracker):
     tracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data, as_dictionary=True)
-    atexit.register(_make_tobii_shutdown(tracker))
+    try:
+        tracker.subscribe_to(tr.EYETRACKER_USER_POSITION_GUIDE, positioning.on_user_position_guide, as_dictionary=True)
+    except Exception as e:
+        logger.warning("User position guide stream unavailable: %s", e)
 
 
 # Logs tracker details in a consistent format
@@ -78,10 +81,14 @@ def _print_tracker_info(tracker):
 # Unsubscribes from Tobii streams to avoid exit-time SDK errors
 def _make_tobii_shutdown(tracker):
     def safe_shutdown():
-        try:
-            tracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data)
-        except Exception:
-            pass
+        for event, cb in (
+            (tr.EYETRACKER_GAZE_DATA, gaze.on_gaze_data),
+            (tr.EYETRACKER_USER_POSITION_GUIDE, positioning.on_user_position_guide),
+        ):
+            try:
+                tracker.unsubscribe_from(event, cb)
+            except Exception:
+                pass
 
     return safe_shutdown
 
@@ -89,13 +96,14 @@ def _make_tobii_shutdown(tracker):
 # Starts the runtime: tracker, video, UI, background loops
 def start():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+    tracker = None
     try:
         sound.set_sound_enabled(config.SOUND_ENABLED)
         if config.SOUND_ENABLED:
             sound.preload_sounds()
 
         tracker = _create_tracker()
-        _subscribe_gaze(tracker)
+        _subscribe_streams(tracker)
         _print_tracker_info(tracker)
 
         cap, wait_time = _open_video()
@@ -113,3 +121,19 @@ def start():
 
     except Exception as e:
         logger.exception("Startup error: %s", e)
+    finally:
+        # Force a prompt, clean process exit. A normal return can hang because the Tobii
+        # SDK and OpenCV HighGUI keep native (non-daemon) threads alive; os._exit avoids
+        # that (and the exit-time SDK __del__ errors) entirely.
+        _shutdown_tracker(tracker)
+        os._exit(0)
+
+
+# Best-effort unsubscribe so the device stops streaming before we exit
+def _shutdown_tracker(tracker):
+    if tracker is None:
+        return
+    try:
+        _make_tobii_shutdown(tracker)()
+    except Exception:
+        pass

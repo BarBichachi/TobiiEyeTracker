@@ -101,4 +101,16 @@ toast_expiry = 0.0
 fullscreen = True
 # Whether the expanded hotkey legend is shown
 show_legend = False
+# Whether the head/eye position guide overlay is shown
+show_position_guide = False
+# endregion
+
+
+# region User Position Guide (head/eye alignment in the tracker track box)
+# Normalized (x, y, z) eye positions; (0.5, 0.5, 0.5) is centered. None until received.
+user_left_pos = None
+user_left_valid = False
+user_right_pos = None
+user_right_valid = False
+last_user_position_time = 0.0
 # endregion
